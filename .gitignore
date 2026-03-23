@@ -1,0 +1,12 @@
+# Backend
+BackendGate2/node_modules/
+
+# Frontend
+FrontendGate2/client/node_modules/
+FrontendGate2/client/dist/
+
+# Env
+.env
+
+# OS
+.DS_Store

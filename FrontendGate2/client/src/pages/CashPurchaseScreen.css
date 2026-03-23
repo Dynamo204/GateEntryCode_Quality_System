@@ -1,0 +1,244 @@
+.cps-page {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #1f2937;
+}
+
+.cps-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 10px;
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.cps-title {
+  color: #1e293b;
+  font-size: 1.65rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  position: relative;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.cps-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.cps-form {
+  background: #fff;
+  padding: 6px 0;
+}
+
+.cps-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 24px;
+  row-gap: 18px;
+  margin-bottom: 24px;
+}
+
+.cps-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cps-field label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e3a5f;
+  text-transform: uppercase;
+}
+
+.cps-input,
+.cps-select,
+.cps-table-input,
+.cps-table-input-sm {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #d7dde8;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #1f2937;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cps-input:focus,
+.cps-select:focus,
+.cps-table-input:focus,
+.cps-table-input-sm:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.cps-input-readonly {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.cps-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232563eb' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.cps-phone-error {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.cps-total-row {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0 0 8px 0;
+}
+
+.cps-total-card {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #059669;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 8px 24px;
+  border: 1px solid #bae6fd;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.04);
+}
+
+.cps-table-wrap {
+  width: 100%;
+  margin: 12px 0;
+}
+
+.cps-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cps-table th,
+.cps-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+}
+
+.cps-table th {
+  background: #f3f4f6;
+  color: #2563eb;
+}
+
+.cps-table-cell-center {
+  text-align: center;
+}
+
+.cps-table-input {
+  padding: 8px 10px;
+}
+
+.cps-table-input-sm {
+  width: 80px;
+  padding: 8px 10px;
+}
+
+.cps-remove-btn {
+  color: #dc2626;
+  background: transparent;
+  border: none;
+  font-weight: 700;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.cps-add-row-btn {
+  margin-top: 8px;
+  background: #f3f4f6;
+  color: #2563eb;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 18px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.cps-submit-btn {
+  margin-top: 12px;
+  padding: 14px 32px;
+  font-size: 1.12rem;
+  border-radius: 10px;
+  min-width: 180px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.cps-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cps-loading {
+  text-align: center;
+  color: #2563eb;
+  margin-top: 16px;
+}
+
+.cps-error {
+  margin-top: 20px;
+  color: #dc2626;
+  text-align: center;
+}
+
+@media (max-width: 1200px) {
+  .cps-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .cps-page {
+    padding: 10px;
+  }
+
+  .cps-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cps-table-wrap {
+    overflow-x: auto;
+  }
+}
