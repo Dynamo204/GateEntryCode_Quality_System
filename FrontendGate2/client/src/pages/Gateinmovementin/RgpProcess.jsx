@@ -73,17 +73,18 @@ export default function RgpProcess() {
   const [activeDescRowId, setActiveDescRowId] = useState(null);
   
 
-  // Trigger print exactly once when success modal opens
-  useEffect(() => {
-    if (showSuccessModal && savedResponseData && !printTriggeredRef.current) {
-      printTriggeredRef.current = true;
-      const timer = setTimeout(() => { handlePrint(); }, 500);
-      return () => clearTimeout(timer);
-    }
-    if (!showSuccessModal) {
-      printTriggeredRef.current = false;
-    }
-  }, [showSuccessModal, savedResponseData]);
+  // Don't auto-print anymore - only print when user clicks Print button
+  // Commenting out automatic print trigger
+  // useEffect(() => {
+  //   if (showSuccessModal && savedResponseData && !printTriggeredRef.current) {
+  //     printTriggeredRef.current = true;
+  //     const timer = setTimeout(() => { handlePrint(); }, 500);
+  //     return () => clearTimeout(timer);
+  //   }
+  //   if (!showSuccessModal) {
+  //     printTriggeredRef.current = false;
+  //   }
+  // }, [showSuccessModal, savedResponseData]);
 
   // Fetch vendor options from backend on mount
   useEffect(() => {
@@ -132,7 +133,8 @@ export default function RgpProcess() {
     driverPhoneNumber: "",
     dlNumber: "",
     remarks: "",
-    gateEntryNum: ""
+    gateEntryNum: "",
+    expecteddateofreturn: ""
   });
 
   // Table rows
@@ -464,6 +466,7 @@ export default function RgpProcess() {
           ["Transporter Code:", getField('transporterCode'), "Transporter Name:", getField('transporterName')],
           ["Driver Name:", getField('driverName'), "Driver Phone:", getField('driverPhoneNumber')],
           ["DL Number:", getField('dlNumber'), "Remarks:", getField('remarks')],
+          ["Expected Return Date:", getField('expecteddateofreturn') || '-', "", ""],
         ];
 
     // Pre-fetch logo as base64 so html2canvas can embed it reliably
@@ -680,6 +683,7 @@ export default function RgpProcess() {
         DLNumber: formData.dlNumber || "",
         ModeOfTransport: sapModeOfTransport,
         Remarks: formData.remarks,
+        Expecteddateofreturn: formData.expecteddateofreturn || null,
         // Do not spread materials here
         tableRows: tableRows // Send all table rows for backend line item storage
       };
@@ -786,10 +790,25 @@ export default function RgpProcess() {
                 <span>{new Date().toLocaleString()}</span>
               </div>
             </div>
-            <button
-              className="sc-primary-btn"
-              onClick={() => setShowSuccessModal(false)}
-            >OK</button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                className="sc-primary-btn"
+                onClick={handlePrint}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >🖨️ Print Slip</button>
+              <button
+                className="sc-primary-btn"
+                onClick={() => setShowSuccessModal(false)}
+              >OK</button>
+            </div>
             {printStatus && (
               <div
                 style={{
@@ -802,7 +821,6 @@ export default function RgpProcess() {
                 {printStatus}
               </div>
             )}
-            {/* Print is triggered via useEffect — no IIFE needed here */}
           </div>
         </div>
       )}
@@ -1219,6 +1237,16 @@ export default function RgpProcess() {
               />
             </div>
 
+            <div className="form-group">
+              <label>Expected Date of Return</label>
+              <input
+                type="date"
+                name="expecteddateofreturn"
+                value={formData.expecteddateofreturn}
+                onChange={handleInputChange}
+              />
+            </div>
+
             {/* Mode of Transport remains here */}
 
 
@@ -1267,16 +1295,29 @@ export default function RgpProcess() {
               </div>
             </div>
 
-            {/* Place (Full Address) moved below Mode of Transport, with increased width */}
-            <div className="form-group full-width">
-              <label>Place</label>
-              <textarea
-                name="place"
-                value={getVendorFullAddress(formData.vendor)}
-                readOnly
-                placeholder="Auto-fetched from vendor address"
-                style={{ backgroundColor: '#f3f4f6', minHeight: '48px', resize: 'vertical', width: '100%', fontSize: '14px' }}
-              />
+            {/* Place and Remarks/Purpose in one row (half + half) */}
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Place</label>
+                <textarea
+                  name="place"
+                  value={getVendorFullAddress(formData.vendor)}
+                  readOnly
+                  placeholder="Auto-fetched from vendor address"
+                  style={{ backgroundColor: '#f3f4f6', minHeight: '48px', resize: 'vertical', width: '100%', fontSize: '14px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Remarks / Purpose</label>
+                <input
+                  type="text"
+                  name="remarks"
+                  value={formData.remarks}
+                  onChange={handleInputChange}
+                  placeholder="Enter remarks or purpose"
+                />
+              </div>
             </div>
 
             {formData.modeOfTransport === "Truck" && (
@@ -1523,16 +1564,6 @@ export default function RgpProcess() {
               </>
             )}
 
-            <div className="form-group full-width">
-              <label>Remarks / Purpose</label>
-              <input
-                type="text"
-                name="remarks"
-                value={formData.remarks}
-                onChange={handleInputChange}
-                placeholder="Enter remarks or purpose"
-              />
-            </div>
           </div>
         </div>
 

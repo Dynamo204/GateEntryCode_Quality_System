@@ -18,7 +18,7 @@ export default function RgpProcessHome() {
           <button onClick={() => navigate("/home/rgp/process/gate-out")} className="action-button">
             RGP Gate Out
           </button>
-          <button onClick={() => navigate("/home/rgp/process/gate-out")} className="action-button">
+          <button onClick={() => navigate('/home/rgp/process/gate-in')} className="action-button">
             RGP Gate In
           </button>
       </div>

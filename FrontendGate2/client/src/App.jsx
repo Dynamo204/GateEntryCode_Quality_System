@@ -33,6 +33,8 @@ import RgpGateIn from "./pages/Gateinmovementin/RgpGateIn.jsx";
 import RgpGateOut from "./pages/Gateinmovementin/RgpGateOut.jsx";
 import NrgpProcess from "./pages/Gateinmovementin/NrgpProcess.jsx";
 import CancelGateEntry from "./pages/Gateinmovementin/CancelGateEntry.jsx";
+import CancelWeightDocument from "./pages/Gateinmovementin/CancelWeightDocument.jsx";
+import ReprintGateEntry from "./pages/Gateinmovementin/ReprintGateEntry.jsx";
 import NrgpProcessHome from "./pages/Gateinmovementin/NrgpProcessHome.jsx";
 import NrgpOut from "./pages/Gateinmovementin/NrgpOut.jsx";
 //GRN Creation
@@ -74,9 +76,11 @@ const HomePage = () => {
   <div>
     <h1 style={{ marginBottom: 20 }}>Gate Entry Screen</h1>
     <nav className="main-nav">
-      <Link to="/home/livedashboard" className="card-link">Dashboard</Link>
-      <Link to="/home/initial_registration" className="card-link">Initial Registration</Link>
-      <Link to="/home/cancel-gate-entry" className="card-link">Cancel Gate Entry</Link>
+      <Link to="/home/livedashboard" className="card-link" style={{ background: 'linear-gradient(135deg, #0061f2 0%, #0040a0 100%)', boxShadow: '0 4px 15px rgba(0,97,242,0.35)' }}>Dashboard</Link>
+      <Link to="/home/initial_registration" className="card-link" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.35)' }}>Initial Registration</Link>
+      <Link to="/home/cancel-gate-entry" className="card-link" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 15px rgba(239,68,68,0.35)' }}>Cancel Gate Entry</Link>
+      <Link to="/home/cancel-weight-doc" className="card-link" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', boxShadow: '0 4px 15px rgba(249,115,22,0.35)' }}>Cancel Weight Doc</Link>
+      <Link to="/home/reprint" className="card-link" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', boxShadow: '0 4px 15px rgba(139,92,246,0.35)' }}>Reprint</Link>
     </nav>
   </div>
   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
@@ -98,14 +102,14 @@ const HomePage = () => {
             <Link to="/home/movein" className="card-link">Gate Entry Movement IN</Link>
           </div>
           <div className="card">
-            <h3>Material Movement  IN</h3>
+            <h3>W B IN ( ZWBIN)</h3>
             <p>Gate Material Details</p>
-            <Link to="/home/Materialin" className="card-link">Material Movement Details IN</Link>
+            <Link to="/home/Materialin" className="card-link">Weighbridge IN ( ZWBIN)</Link>
           </div>
           <div className="card">
-            <h3>Material Movement  Out</h3>
+            <h3>W B OUT ( ZWBOUT)</h3>
             <p>Gate Material Details</p>
-            <Link to="/home/materialout" className="card-link">Material Movement Details Out</Link>
+            <Link to="/home/materialout" className="card-link">Weighbridge OUT ( ZWBOUT)</Link>
           </div>
           <div className="card">
             <h3>Gate Entry Out</h3>
@@ -113,19 +117,19 @@ const HomePage = () => {
             <Link to="/home/moveout" className="card-link">Gate Entry Movement Out</Link>
           </div>
             <div className="card">
-            <h3>QR Scanner In🔍</h3>
+              <h3>ZWBIN QR Scanner</h3>
             <p>Inward</p>
-            <Link to="/home/qrscanner/inward" className="card-link">QR Scanner Inward</Link>
+              <Link to="/home/qrscanner/inward" className="card-link">ZWBIN QR Scanner</Link>
           </div>
           <div className="card">
-            <h3>QR Scanner Out🔍</h3>
+              <h3>ZWBOUT QR Scanner</h3>
             <p>Outward</p>
-            <Link to="/home/qrscanner/outward" className="card-link">QR Scanner Outward</Link>
+              <Link to="/home/qrscanner/outward" className="card-link">ZWBOUT QR Scanner</Link>
           </div>
           <div className="card">
-            <h3>Internal Transfer Posting</h3>
+              <h3>Internal Transfer</h3>
             <p>ITP Details</p>
-            <Link to="/home/transferposting" className="card-link">Internal Transfer Posting</Link>
+              <Link to="/home/transferposting" className="card-link">Internal Transfer</Link>
           </div>
                     <div className="card">
                       <h3>Stores and Consumable</h3>
@@ -146,11 +150,6 @@ const HomePage = () => {
                       <h3>GRN Creation</h3>
                       <p>Create GRN by Gate Entry Number</p>
                       <Link to="/home/grncreate" className="card-link">GRN Creation</Link>
-                    </div>
-                    <div className="card">
-                      <h3>Cancel Gate Entry</h3>
-                      <p>Cancel existing gate entry</p>
-                      <Link to="/home/cancel-gate-entry" className="card-link">Cancel Gate Entry</Link>
                     </div>
         </div>
       </main>
@@ -302,6 +301,8 @@ export default function App() {
                 <Route path="/home/nrgp/process/gate-out" element={<ProtectedRoute allowedRoles={["101","102"]}><NrgpOut /></ProtectedRoute>} />
         {/* Cancel Gate Entry */}
         <Route path="/home/cancel-gate-entry" element={<ProtectedRoute allowedRoles={["101","102"]}><CancelGateEntry /></ProtectedRoute>} />
+        <Route path="/home/cancel-weight-doc" element={<ProtectedRoute allowedRoles={["101","102"]}><CancelWeightDocument /></ProtectedRoute>} />
+        <Route path="/home/reprint" element={<ProtectedRoute allowedRoles={["101","102","103"]}><ReprintGateEntry /></ProtectedRoute>} />
         {/* GRN Creation */}
         <Route path="/home/grncreate" element={<ProtectedRoute allowedRoles={["101","102"]}><GrnCreateByGateEntry /></ProtectedRoute>} />
       </Routes>

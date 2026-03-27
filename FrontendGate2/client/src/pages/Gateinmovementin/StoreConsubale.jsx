@@ -534,7 +534,8 @@ export default function StoresConsumable() {
       const updatedHeader = {
         ...headerWithoutMode,
         GateEntryNumber: newGateEntryNumber,
-        TransportMode: TransporterMode // Map TransporterMode to TransportMode for backend
+        TransportMode: TransporterMode, // Map TransporterMode to TransportMode for backend
+        InwardTime: new Date().toTimeString().slice(0, 8),
       };
 
       console.log('Sending to backend:', updatedHeader); // Debug log
@@ -580,26 +581,11 @@ export default function StoresConsumable() {
         items: usedItems,
       };
 
-      // Auto-print; show success modal only after confirmed print
+      // Do NOT auto-print. Only show success modal and allow user to print manually.
+      setSuccessData(successPayload);
+      setShowSuccess(true);
+      setPrintStatus({ type: '', message: '' });
       setPrintError("");
-      setPrinting(true);
-      try {
-        await printPdfSlip(successPayload);
-        // Print succeeded — now show success modal
-        setSuccessData(successPayload);
-        setShowSuccess(true);
-        setPrintStatus({ type: "success", message: "Printed successfully" });
-      } catch (printErr) {
-        const backendError = printErr?.response?.data?.error || printErr?.response?.data?.message || "";
-        const backendData = printErr?.response?.data?.data;
-        const suffix = backendData ? ` | ${JSON.stringify(backendData)}` : "";
-        const exactError = `${backendError || printErr?.message || "Print failed"}${suffix}`;
-        setSuccessData(successPayload);
-        setPrintError(`Entry ${successPayload.gateEntry} created, but print failed: ${exactError}`);
-      } finally {
-        setPrinting(false);
-      }
-
       setMsg("");
       setMsgType("");
     } catch (err) {
@@ -802,6 +788,8 @@ export default function StoresConsumable() {
             <th>Ordered</th>
             <th>Remaining</th>
             <th>Receive Qty</th>
+            <th>Vendor</th>
+            <th>Vendor Name</th>
             <th>Vendor Invoice Number</th>
             <th>Vendor Invoice Date</th>
             <th>Remove</th>
@@ -810,7 +798,7 @@ export default function StoresConsumable() {
         <tbody>
           {poItems.length === 0 ? (
             <tr>
-              <td colSpan="8" style={{ textAlign: "center" }}>No PO Items</td>
+              <td colSpan="10" style={{ textAlign: "center" }}>No PO Items</td>
             </tr>
           ) : (
             // Group items by PO number
@@ -823,7 +811,7 @@ export default function StoresConsumable() {
               }, {})
             ).map(([po, items]) => [
               <tr key={po} className="sc-po-header-row">
-                <td colSpan="8" style={{ fontWeight: 'bold', background: '#f5f5f5' }}>PO: {po}</td>
+                <td colSpan="10" style={{ fontWeight: 'bold', background: '#f5f5f5' }}>PO: {po}</td>
               </tr>,
               ...items.map((i, idx) => (
                 <tr key={po + '_' + i.PurchaseOrderItem}>
@@ -840,6 +828,8 @@ export default function StoresConsumable() {
                       placeholder="0"
                     />
                   </td>
+                  <td>{i.Vendor || ''}</td>
+                  <td>{i.VendorName || ''}</td>
                   <td>
                     <input
                       className="sc-input"

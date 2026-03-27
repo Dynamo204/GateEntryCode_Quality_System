@@ -3,6 +3,16 @@ import { fetchRgpGateEntryByNumber, saveRgpGateOut, fetchRgpLineItems } from "..
 import "./CreateHeader.css";
 
 export default function RgpGateOut() {
+  const getVehicleStatus = (header) => {
+    if (!header) return "";
+    return String(
+      header.VehicleStatus ||
+      header["d:VehicleStatus"] ||
+      header.vehicleStatus ||
+      ""
+    ).toUpperCase();
+  };
+
   const formatDateToIST = (value) => {
     if (!value) return "";
     try {
@@ -74,6 +84,13 @@ export default function RgpGateOut() {
       setError("");
       setSuccess(false);
       try {
+        const currentStatus = getVehicleStatus(entryData);
+        if (currentStatus === "OUT") {
+          setError("Gate Out was already done for this entry.");
+          setLoading(false);
+          return;
+        }
+
         // Only PATCH ReturnableQty for line items
         const patchItems = lineItems.map(item => ({
           SAP_UUID: item.SAP_UUID || item.sap_uuid || item.uuid,
@@ -173,6 +190,14 @@ export default function RgpGateOut() {
       const header = headerRes?.data?.d?.results?.[0] || headerRes?.data || null;
       if (!header) throw new Error("No header found");
       setEntryData(header);
+
+      if (getVehicleStatus(header) === "OUT") {
+        setLineItems([]);
+        setError("Gate Out was already done for this entry.");
+        setLoading(false);
+        return;
+      }
+
         // Fetch all line items for this Gate Entry using a dedicated API path
         let itemsRes;
         if (header.GateEntryNumber) {
@@ -191,6 +216,8 @@ export default function RgpGateOut() {
           SAP_UUID: item.SAP_UUID || item.sap_uuid || item.uuid || item['d:SAP_UUID'] || item['SAP_UUID'] || item['Guid'] || item['d:Guid'] || "",
           Material: item.Material || item.material || item['d:Material'] || "",
           MaterialDescription: item.MaterialDescription || item.materialDescription || item['d:MaterialDescription'] || "",
+          RecivedQty: item.RecivedQty ?? item.recivedQty ?? item.ReceivedQty ?? item.receivedQty ?? item['d:RecivedQty'] ?? item['d:ReceivedQty'] ?? "",
+          RemainQty: item.RemainQty ?? item.remainQty ?? item['d:RemainQty'] ?? "",
           ReturnableQty: item.ReturnableQty ?? item.returnableQty ?? item.Quantity ?? item.quantity ?? item['d:ReturnableQty'] ?? "",
           UOM: item.UOM || item.uom || item.UnitOfMeasure || item['d:UOM'] || "",
           ApproximateValue: item.ApproximateValue ?? item.approximateValue ?? item.Value ?? item['d:ApproximateValue'] ?? "",
@@ -242,12 +269,12 @@ export default function RgpGateOut() {
           <input type="text" className="form-input" value={entryData?.VehicleNumber || ''} readOnly style={{ backgroundColor: '#f0f0f0', marginBottom: '0' }} />
         </div>
         <div className="form-group" style={{marginBottom: '0'}}>
-          <label className="form-label" style={{marginBottom: '2px'}}>Inward Time</label>
+          <label className="form-label" style={{marginBottom: '2px'}}>Creation Time</label>
           <input type="text" className="form-input" value={formatTimeToIST(entryData?.InwardTime || entryData?.['d:InwardTime'] || '')} readOnly style={{ backgroundColor: '#f0f0f0', marginBottom: '0' }} />
         </div>
         <div className="form-group" style={{marginBottom: '0'}}>
-          <label className="form-label" style={{marginBottom: '2px'}}>Gate Entry Date</label>
-          <input type="text" className="form-input" value={formatDateToIST(entryData?.GateEntryDate || entryData?.['d:GateEntryDate'] || '')} readOnly style={{ backgroundColor: '#f0f0f0', marginBottom: '0' }} />
+          <label className="form-label" style={{marginBottom: '2px'}}>Expected Date of Return</label>
+          <input type="text" className="form-input" value={formatDateToIST(entryData?.Expecteddateofreturn || entryData?.['d:Expecteddateofreturn'] || '')} readOnly style={{ backgroundColor: '#f0f0f0', marginBottom: '0' }} />
         </div>
       </div>
       
@@ -285,6 +312,8 @@ export default function RgpGateOut() {
                   <th>#</th>
                   <th>Material Code</th>
                   <th>Description</th>
+                  <th style={{ display: 'none' }}>Recived Qty</th>
+                  <th style={{ display: 'none' }}>Remain Qty</th>
                   <th>Returnable Qty</th>
                   <th>UOM</th>
                   <th>Approx. Value</th>
@@ -298,6 +327,8 @@ export default function RgpGateOut() {
                     <td>{idx + 1}</td>
                     <td>{item.Material}</td>
                     <td>{item.MaterialDescription}</td>
+                    <td style={{ display: 'none' }}>{item.RecivedQty}</td>
+                    <td style={{ display: 'none' }}>{item.RemainQty}</td>
                     <td>
                       <input
                         type="number"

@@ -3,29 +3,271 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const router = express.Router();
+
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatDecimal(value) {
+  return toNumber(value).toFixed(2);
+}
+
+function parseSapDurationToSeconds(value) {
+  if (!value || typeof value !== 'string') return 0;
+  const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!match) return 0;
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+function getIstNowParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || '00';
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+    second: get('second'),
+  };
+}
+
+function getCurrentIstSapDateTime() {
+  const now = getIstNowParts();
+  return {
+    receivedDate: `${now.year}-${now.month}-${now.day}T00:00:00`,
+    receivedTime: `PT${now.hour}H${now.minute}M${now.second}S`,
+  };
+}
+
+function getLineItemTimestamp(item) {
+  const rawDate = item?.RecivedDate || item?.ReceivedDate || item?.['d:RecivedDate'] || item?.['d:ReceivedDate'] || '';
+  const rawTime = item?.RecivedTime || item?.ReceivedTime || item?.['d:RecivedTime'] || item?.['d:ReceivedTime'] || '';
+
+  let dateMs = 0;
+  if (typeof rawDate === 'string' && rawDate.startsWith('/Date(')) {
+    const match = rawDate.match(/\/Date\(([-\d+]+)(?:[+-]\d+)?\)\//);
+    if (match) {
+      dateMs = Number(match[1]) || 0;
+    }
+  } else if (rawDate) {
+    const parsed = new Date(rawDate).getTime();
+    dateMs = Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return dateMs + (parseSapDurationToSeconds(rawTime) * 1000);
+}
+
+function getMaterialKey(item) {
+  return String(item?.Material || item?.material || item?.['d:Material'] || item?.SAP_UUID || '').trim();
+}
+
+function pickLatestLineItems(items) {
+  const latestByMaterial = new Map();
+  items.forEach((item) => {
+    const materialKey = getMaterialKey(item);
+    if (!materialKey) {
+      return;
+    }
+    const current = latestByMaterial.get(materialKey);
+    const itemTs = getLineItemTimestamp(item);
+    const currentTs = current ? getLineItemTimestamp(current) : -1;
+    if (!current || itemTs >= currentTs) {
+      latestByMaterial.set(materialKey, item);
+    }
+  });
+  return Array.from(latestByMaterial.values());
+}
+
+async function fetchRgpHeaderByGateEntryNumber(gateEntryNumber) {
+  const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const headerPath = `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
+  const headerResp = await axios.get(SAP_URL_BASE + headerPath, {
+    auth: { username: SAP_USER, password: SAP_PASS },
+  });
+  return headerResp.data?.d?.results?.[0] || null;
+}
+
+async function fetchRgpLineItemsByParentUuid(parentUUID) {
+  const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const navigationPath = `/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems?$format=json`;
+
+  try {
+    const navResp = await axios.get(SAP_URL_BASE + navigationPath, {
+      auth: { username: SAP_USER, password: SAP_PASS },
+    });
+    const navItems = navResp.data?.d?.results || [];
+    if (Array.isArray(navItems) && navItems.length > 0) {
+      return navItems;
+    }
+  } catch (navErr) {
+    console.warn('[WARN] Navigation fetch for RGP line items failed, trying filter fallback:', navErr?.response?.data || navErr.message);
+  }
+
+  const filterPath = `/YY1_GATEENTRYITEMS_GATEINWA000?$filter=SAP_PARENT_UUID eq guid'${parentUUID}'&$format=json`;
+  const filterResp = await axios.get(SAP_URL_BASE + filterPath, {
+    auth: { username: SAP_USER, password: SAP_PASS },
+  });
+  return filterResp.data?.d?.results || [];
+}
+
+function buildReceiptLinePayload(sourceItem, receivedQuantity) {
+  const { receivedDate, receivedTime } = getCurrentIstSapDateTime();
+  const previousRemainQty = toNumber(sourceItem?.RemainQty ?? sourceItem?.['d:RemainQty'] ?? sourceItem?.ReturnableQty ?? sourceItem?.['d:ReturnableQty']);
+  const updatedRemainQty = previousRemainQty - receivedQuantity;
+
+  return {
+    PurchaseOrderNumber: sourceItem?.PurchaseOrderNumber || '',
+    PurchaseOrderItem: sourceItem?.PurchaseOrderItem || '',
+    Material: sourceItem?.Material || '',
+    MaterialDescription: sourceItem?.MaterialDescription || '',
+    Vendor: sourceItem?.Vendor || '',
+    VendorName: sourceItem?.VendorName || '',
+    VendorInvoiceNumber: sourceItem?.VendorInvoiceNumber || '',
+    VendorInvoicedate: sourceItem?.VendorInvoicedate || null,
+    VendorInvoiceWeight: sourceItem?.VendorInvoiceWeight || '0.000',
+    BalanceQty: sourceItem?.BalanceQty || '0.000',
+    SalesDocument: sourceItem?.SalesDocument || '',
+    Customer: sourceItem?.Customer || '',
+    RecivedQty: formatDecimal(receivedQuantity),
+    RemainQty: formatDecimal(updatedRemainQty),
+    ReturnableQty: sourceItem?.ReturnableQty != null ? String(sourceItem.ReturnableQty) : formatDecimal(previousRemainQty),
+    UOM: sourceItem?.UOM || '',
+    ApproximateValue: sourceItem?.ApproximateValue || '0.00',
+    Remarks: sourceItem?.Remarks || '',
+    Purpose: sourceItem?.Purpose || '',
+    Description: sourceItem?.Description || '',
+    Quantity: sourceItem?.Quantity || '0.000',
+    Rate: sourceItem?.Rate || '0.00',
+    Amount: sourceItem?.Amount || '0.0000',
+    Remarks1: sourceItem?.Remarks1 || '',
+    RecivedDate: receivedDate,
+    RecivedTime: receivedTime,
+  };
+}
+
 // GET /api/rgpprocess/:gateEntryNumber/items - fetch all line items for a Gate Entry
 router.get('/:gateEntryNumber/items', async (req, res) => {
   try {
     const { gateEntryNumber } = req.params;
-    const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    // Step 1: Fetch header by GateEntryNumber
-    const headerPath = `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
-    const headerResp = await axios.get(SAP_URL_BASE + headerPath, {
-      auth: { username: SAP_USER, password: SAP_PASS },
-    });
-    const header = headerResp.data?.d?.results?.[0];
+    const header = await fetchRgpHeaderByGateEntryNumber(gateEntryNumber);
     if (!header || !header.SAP_UUID) {
       return res.status(404).json({ error: 'Gate Entry not found or missing SAP_UUID' });
     }
-    // Step 2: Fetch all line items where SAP_PARENT_UUID matches header's SAP_UUID
-    const itemsPath = `/YY1_GATEENTRYITEMS_GATEINWA000?$filter=SAP_PARENT_UUID eq guid'${header.SAP_UUID}'&$format=json`;
-    const itemsResp = await axios.get(SAP_URL_BASE + itemsPath, {
-      auth: { username: SAP_USER, password: SAP_PASS },
-    });
-    res.json(itemsResp.data);
+    const items = await fetchRgpLineItemsByParentUuid(header.SAP_UUID);
+    const latestItems = pickLatestLineItems(items);
+    res.json({ items: latestItems });
   } catch (err) {
     console.error('[ERROR] Failed to fetch RGP line items by GateEntryNumber:', err?.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch RGP line items by GateEntryNumber' });
+  }
+});
+
+router.post('/:gateEntryNumber/receive', async (req, res) => {
+  try {
+    const { gateEntryNumber } = req.params;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+
+    if (!gateEntryNumber || items.length === 0) {
+      return res.status(400).json({ error: 'Missing gateEntryNumber or receipt items' });
+    }
+
+    const header = await fetchRgpHeaderByGateEntryNumber(gateEntryNumber);
+    if (!header || !header.SAP_UUID) {
+      return res.status(404).json({ error: 'Gate Entry not found or missing SAP_UUID' });
+    }
+
+    const allItems = await fetchRgpLineItemsByParentUuid(header.SAP_UUID);
+    const latestItems = pickLatestLineItems(allItems);
+
+    if (latestItems.length > 0 && latestItems.every((item) => toNumber(item?.RemainQty ?? item?.['d:RemainQty']) <= 0)) {
+      return res.status(400).json({ error: 'Gate Entry process is closed. All quantities are received.' });
+    }
+
+    const latestByMaterial = new Map(latestItems.map((item) => [getMaterialKey(item), item]));
+    const preparedReceipts = [];
+
+    for (const item of items) {
+      const receivedQuantity = toNumber(item?.receivedQuantity);
+      if (receivedQuantity <= 0) {
+        continue;
+      }
+
+      const materialKey = String(item?.materialCode || item?.Material || '').trim();
+      const sourceItem = latestByMaterial.get(materialKey);
+      if (!sourceItem) {
+        return res.status(400).json({ error: `Latest line item not found for material ${materialKey || 'unknown'}` });
+      }
+
+      const currentRemainQty = toNumber(sourceItem?.RemainQty ?? sourceItem?.['d:RemainQty'] ?? sourceItem?.ReturnableQty ?? sourceItem?.['d:ReturnableQty']);
+      if (currentRemainQty <= 0) {
+        return res.status(400).json({ error: 'Gate Entry process is closed. All quantities are received.' });
+      }
+
+      if (receivedQuantity > currentRemainQty) {
+        return res.status(400).json({ error: `Received Quantity cannot exceed Remaining Quantity for material ${materialKey}` });
+      }
+
+      preparedReceipts.push({
+        materialKey,
+        linePayload: buildReceiptLinePayload(sourceItem, receivedQuantity),
+      });
+    }
+
+    if (preparedReceipts.length === 0) {
+      return res.status(400).json({ error: 'Please enter at least one valid Received Quantity' });
+    }
+
+    const tokenResp = await axios.get(SAP_URL, {
+      auth: { username: SAP_USER, password: SAP_PASS },
+      headers: { 'x-csrf-token': 'Fetch' },
+    });
+    const csrfToken = tokenResp.headers['x-csrf-token'];
+    const cookies = tokenResp.headers['set-cookie'] || [];
+
+    const lineItemURL = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${header.SAP_UUID}')/to_GateEntryItems`;
+    const created = [];
+
+    for (const receipt of preparedReceipts) {
+      const createResp = await axios.post(lineItemURL, receipt.linePayload, {
+        auth: { username: SAP_USER, password: SAP_PASS },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+          Cookie: cookies.join(';'),
+        },
+      });
+      created.push(createResp.data?.d || createResp.data || { Material: receipt.materialKey });
+    }
+
+    const refreshedItems = await fetchRgpLineItemsByParentUuid(header.SAP_UUID);
+    const latestRefreshedItems = pickLatestLineItems(refreshedItems);
+    const processClosed = latestRefreshedItems.length > 0 && latestRefreshedItems.every((item) => toNumber(item?.RemainQty ?? item?.['d:RemainQty']) <= 0);
+
+    res.json({
+      success: true,
+      created,
+      items: latestRefreshedItems,
+      processClosed,
+    });
+  } catch (err) {
+    console.error('[ERROR] Failed to create RGP Gate In receipt history:', err?.response?.data || err.message);
+    const sapError = err?.response?.data?.error?.message?.value || err?.response?.data?.error || err?.response?.data || err.message;
+    res.status(500).json({ error: sapError || 'Failed to create RGP Gate In receipt history' });
   }
 });
 // PATCH ReturnableQty for existing line items by GateEntryNumber (utility endpoint)
@@ -58,8 +300,8 @@ router.patch('/update-returnableqty/:gateEntryNumber', async (req, res) => {
         const itemPatchUrl = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
         // Debug log
         console.log('[DEBUG] PATCH URL:', itemPatchUrl);
-        console.log('[DEBUG] PATCH payload (number):', { ReturnableQty: item.ReturnableQty });
-        console.log('[DEBUG] PATCH payload (string):', { ReturnableQty: String(item.ReturnableQty) });
+        console.log('[DEBUG] PATCH payload (number):', { ReturnableQty: item.ReturnableQty, RemainQty: item.ReturnableQty });
+        console.log('[DEBUG] PATCH payload (string):', { ReturnableQty: String(item.ReturnableQty), RemainQty: String(item.ReturnableQty) });
         try {
           let patchResp;
           try {
@@ -73,7 +315,7 @@ router.patch('/update-returnableqty/:gateEntryNumber', async (req, res) => {
                 'x-csrf-token': csrfToken,
                 Cookie: cookies.join(';'),
               },
-              data: { ReturnableQty: item.ReturnableQty },
+              data: { ReturnableQty: item.ReturnableQty, RemainQty: item.ReturnableQty },
             });
           } catch (errNum) {
             // If PATCH with number fails, try with string
@@ -87,7 +329,7 @@ router.patch('/update-returnableqty/:gateEntryNumber', async (req, res) => {
                 'x-csrf-token': csrfToken,
                 Cookie: cookies.join(';'),
               },
-              data: { ReturnableQty: String(item.ReturnableQty) },
+              data: { ReturnableQty: String(item.ReturnableQty), RemainQty: String(item.ReturnableQty) },
             });
           }
           if (patchResp.status !== 204 && patchResp.status !== 200) {
@@ -285,8 +527,9 @@ router.post('/', async (req, res) => {
       gateEntryDate = gateEntryDate + 'T00:00:00';
     }
 
-    // Fix SAP date format for ExpectedDateOfReturn
-    let expectedDateOfReturn = req.body.ExpectedDateOfReturn;
+    // Fix SAP date format for Expecteddateofreturn
+    // Support both key variants from UI/integrations.
+    let expectedDateOfReturn = req.body.Expecteddateofreturn || req.body.ExpectedDateOfReturn;
     if (expectedDateOfReturn && /^\d{4}-\d{2}-\d{2}$/.test(expectedDateOfReturn)) {
       expectedDateOfReturn = expectedDateOfReturn + 'T00:00:00';
     }
@@ -332,6 +575,7 @@ router.post('/', async (req, res) => {
       Department: req.body.Department || '',
       Requisitioner: req.body.Requisitioner || '',
       Place: req.body.Place || '',
+      Expecteddateofreturn: expectedDateOfReturn || null,
       // No material fields here
     };
 
@@ -385,10 +629,12 @@ router.post('/', async (req, res) => {
     const lineItemURL = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`;
     for (const row of tableRows) {
       // Prepare line item payload (fields same as table row)
+      const returnableQty = parseFloat(row.returnableQuantity) || 0;
       const linePayload = {
         Material: row.materialCode || '',
         MaterialDescription: row.materialDescription || '',
-        ReturnableQty: row.returnableQuantity || '0.00',
+        ReturnableQty: returnableQty.toString(),
+        RemainQty: returnableQty.toString(), // Keep RemainQty same as ReturnableQty at creation time
         UOM: row.uom || '',
         ApproximateValue: row.approximateValue || '0.00',
         Remarks: row.remarks || '',

@@ -225,79 +225,77 @@ export default function NrgpProcess() {
     }
   };
 
-  useEffect(() => {
-    if (showSuccessModal && savedResponseData && !printTriggeredRef.current) {
-      printTriggeredRef.current = true;
-      const timer = setTimeout(() => {
-        handlePrint();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
 
-    if (!showSuccessModal) {
-      printTriggeredRef.current = false;
-    }
-  }, [showSuccessModal, savedResponseData]);
+  // Remove auto-print. Only print when user clicks Print button.
 
   // Parse SAP error into user-friendly message
   const parseError = (error) => {
     if (!error) return "An unexpected error occurred. Please try again.";
 
     // Extract error message from various formats
-    let errorMessage = "";
-
-    // Check for response data
-    if (error.response) {
-      const { data, status } = error.response;
-
-      // Handle XML error responses
-      if (typeof data === 'string' && (data.includes('<?xml') || data.includes('<error>'))) {
-        const messageMatch = data.match(/<message>(.*?)<\/message>/i);
-        if (messageMatch) {
-          errorMessage = messageMatch[1];
-        } else {
-          errorMessage = "SAP system error. Please check your inputs and try again.";
-        }
-      }
-      // Handle JSON error responses
-      else if (data?.error) {
-        if (typeof data.error === 'string') {
-          errorMessage = data.error;
-        } else if (data.error.message) {
-          errorMessage = data.error.message.value || data.error.message;
-        }
-      }
-      // Handle OData error format
-      else if (data?.d?.ErrorMessage) {
-        errorMessage = data.d.ErrorMessage;
-      }
-      // HTTP status based messages
-      else if (status === 400) {
-        errorMessage = "Invalid data provided. Please check all fields.";
-      } else if (status === 401 || status === 403) {
-        errorMessage = "Authentication failed. Please check your credentials.";
-      } else if (status === 404) {
-        errorMessage = "Service not found. Please contact support.";
-      } else if (status === 500) {
-        errorMessage = "Server error occurred. Please try again later.";
-      } else if (status === 503) {
-        errorMessage = "Service temporarily unavailable. Please try again.";
-      }
-    }
-    // Network errors
-    else if (error.request) {
-      errorMessage = "Unable to connect to server. Please check your internet connection.";
-    }
-    // Other errors
-    else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    // Clean up technical jargon
-    errorMessage = errorMessage
-      .replace(/OData/gi, "System")
-      .replace(/CSRF/gi, "Security token")
-      .replace(/HTTP/gi, "Connection");
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="modal-overlay">
+          <div className="success-modal">
+            <div className="success-icon">✓</div>
+            <h3>NRGP Gate Entry Created Successfully!</h3>
+            <div className="gate-entry-info">
+              <label>Gate Entry Number:</label>
+              <div className="gate-number-wrapper">
+                <div className="gate-number">{createdGateEntryNum}</div>
+                <button 
+                  className="copy-icon-btn"
+                  onClick={handleCopyGateEntry}
+                  title="Copy to clipboard"
+                  type="button"
+                >
+                  {copied ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+            <p className="stores-message">Stores and Consumable</p>
+            <button 
+              className="submit-btn"
+              style={{ marginTop: "10px", marginBottom: "6px" }}
+              onClick={handlePrint}
+              type="button"
+              disabled={!savedResponseData}
+            >
+              Print Gate Entry Slip
+            </button>
+            {printStatus && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  textAlign: "center",
+                  fontWeight: "600",
+                  color: printStatus.toLowerCase().includes("failed") ? "#dc2626" : "#166534"
+                }}
+              >
+                {printStatus}
+              </div>
+            )}
+            <button 
+              className="ok-btn"
+              onClick={() => {
+                setShowSuccessModal(false);
+                navigate("/home");
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
     return errorMessage || "Failed to create gate entry. Please verify all information and try again.";
   };
@@ -455,6 +453,15 @@ export default function NrgpProcess() {
               </div>
             </div>
             <p className="stores-message">Stores and Consumable</p>
+            <button 
+              className="submit-btn"
+              style={{ marginTop: "10px", marginBottom: "6px" }}
+              onClick={handlePrint}
+              type="button"
+              disabled={!savedResponseData}
+            >
+              Print Slip
+            </button>
             {printStatus && (
               <div
                 style={{

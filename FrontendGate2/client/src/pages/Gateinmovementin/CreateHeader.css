@@ -196,6 +196,18 @@ body {
   gap: 12px;
 }
 
+.grid-7-cols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.grid-8-cols {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .grid-2-cols {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -813,6 +825,10 @@ textarea {
   .grid-2-cols {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+
+  .grid-8-cols {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -821,12 +837,22 @@ textarea {
   .grid-2-cols {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .grid-7-cols,
+  .grid-8-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
   .grid-3-cols,
   .grid-4-cols,
   .grid-2-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-7-cols,
+  .grid-8-cols {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -844,6 +870,11 @@ textarea {
   .grid-3-cols,
   .grid-4-cols,
   .grid-2-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-7-cols,
+  .grid-8-cols {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

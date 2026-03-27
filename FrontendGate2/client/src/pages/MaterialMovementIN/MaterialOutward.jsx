@@ -36,7 +36,7 @@ const createInitialState = () => {
     BalanceQty: '',
 
     TruckNumber: '',
-    TruckCapacity: '',
+    TruckCapacity: '70',
     TransporterCode: '',
     LRGCNumber: '',
     PermitNumber: '',

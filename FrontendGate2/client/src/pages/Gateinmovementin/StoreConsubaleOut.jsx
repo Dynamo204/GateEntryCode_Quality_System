@@ -16,6 +16,24 @@ export default function StoreConsubaleOut() {
   const [lineItems, setLineItems] = useState([]);
   const [fetchError, setFetchError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [outwardDate, setOutwardDate] = useState(new Date().toISOString().split("T")[0]);
+
+  const parseSapDateToIso = (rawDate) => {
+    if (!rawDate) return "";
+
+    if (typeof rawDate === "string") {
+      const match = rawDate.match(/\/Date\((\d+)\)\//);
+      if (match) {
+        const date = new Date(Number(match[1]));
+        if (!Number.isNaN(date.getTime())) return date.toISOString().split("T")[0];
+      }
+      if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) return rawDate.slice(0, 10);
+    }
+
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().split("T")[0];
+  };
 
   const handleFetch = async () => {
 
@@ -37,6 +55,7 @@ export default function StoreConsubaleOut() {
       setEntryData(header);
       setVehicleNumber(header.VehicleNumber || "");
       setRemarks(header.Remarks || "");
+      setOutwardDate(parseSapDateToIso(header.GateOutDate) || new Date().toISOString().split("T")[0]);
 
       let itemsRes;
 
@@ -78,6 +97,7 @@ export default function StoreConsubaleOut() {
         VehicleNumber: vehicleNumber,
         Remarks: remarks,
         Indicators: "SC_OUT",
+        GateOutDate: outwardDate,
         OutwardTime: outwardTime,
         VehicleStatus: "OUT", // Set status to OUT when submitting
       };
@@ -138,13 +158,31 @@ export default function StoreConsubaleOut() {
                   value={
                     entryData.GateEntryDate
                       ? (() => {
-                          // Convert OData UTC date to IST and format as dd-MM-yyyy HH:mm:ss
-                          const utcDate = new Date(entryData.GateEntryDate);
-                          if (isNaN(utcDate)) return "N/A";
-                          // IST is UTC+5:30
-                          const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-                          const pad = (n) => n.toString().padStart(2, '0');
-                          return `${pad(istDate.getDate())}-${pad(istDate.getMonth()+1)}-${istDate.getFullYear()} ${pad(istDate.getHours())}:${pad(istDate.getMinutes())}:${pad(istDate.getSeconds())}`;
+                          const rawDate = entryData.GateEntryDate;
+                          let parsedDate;
+
+                          // Support SAP OData V2 format: /Date(1742668800000)/
+                          if (typeof rawDate === "string") {
+                            const match = rawDate.match(/\/Date\((\d+)\)\//);
+                            parsedDate = match ? new Date(Number(match[1])) : new Date(rawDate);
+                          } else {
+                            parsedDate = new Date(rawDate);
+                          }
+
+                          if (Number.isNaN(parsedDate.getTime())) return "N/A";
+
+                          return parsedDate
+                            .toLocaleString("en-GB", {
+                              timeZone: "Asia/Kolkata",
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false,
+                            })
+                            .replace(",", "");
                         })()
                       : "N/A"
                   }
@@ -156,6 +194,15 @@ export default function StoreConsubaleOut() {
                   className="scout-input"
                   readOnly
                   value={entryData.VehicleNumber || "N/A"}
+                />
+              </div>
+              <div>
+                <label>Outward Date</label>
+                <input
+                  className="scout-input"
+                  type="date"
+                  value={outwardDate}
+                  onChange={(e) => setOutwardDate(e.target.value)}
                 />
               </div>
               <div>

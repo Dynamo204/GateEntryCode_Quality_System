@@ -4,24 +4,34 @@ const net = require("net");
 const router = express.Router();
 
 // Client Public IP (Weighbridge / Local Server)
-const W1_HOST = "192.168.10.22";
-const W2_HOST = "192.168.10.23";
-const W3_HOST = "192.168.10.22";
-const W4_HOST = "192.168.10.23";
-const CLIENT_PORT = 2191;
+
+// const W1_HOST = "192.168.10.22";
+// const W2_HOST = "192.168.10.23";
+// const W3_HOST = "192.168.10.22";
+// const W4_HOST = "192.168.10.23";
+
+
+
+const W1_HOST = "136.233.76.90";
+const W2_HOST = "136.233.76.90";
+const W3_HOST = "136.233.76.90";
+const W4_HOST = "136.233.76.90";
+const W2_CLIENT_PORT = 2122;
+const W4_CLIENT_PORT = 2123;
+const DEFAULT_CLIENT_PORT = W2_CLIENT_PORT;
 
 // TCP connection timeout
 const TCP_TIMEOUT = 10000;
 
-function readWeightFromClient(host = W3_HOST) {
+function readWeightFromClient(host = W3_HOST, port = DEFAULT_CLIENT_PORT) {
   return new Promise((resolve, reject) => {
     const client = new net.Socket();
     let data = "";
 
     client.setTimeout(TCP_TIMEOUT);
 
-    client.connect(CLIENT_PORT, host, () => {
-      console.log(`[WEIGHBRIDGE] Connected to weighbridge ${host}:${CLIENT_PORT}`);
+    client.connect(port, host, () => {
+      console.log(`[WEIGHBRIDGE] Connected to weighbridge ${host}:${port}`);
     });
 
     client.on("data", (chunk) => {
@@ -76,7 +86,7 @@ router.get("/api/pellet-in-weight", async (req, res) => {
 // Pallet Out: outward/tare weighbridge mapped to W4
 router.get("/api/pallet-out-weight", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W4_HOST);
+    const weightData = await readWeightFromClient(W4_HOST, W4_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({
@@ -104,7 +114,7 @@ router.get("/api/gate-in-wayment", async (req, res) => {
 // Gate Out wayment: W2 bridge for specific movement screens
 router.get("/api/gate-out-wayment", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W2_HOST);
+    const weightData = await readWeightFromClient(W2_HOST, W2_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({
@@ -131,7 +141,7 @@ router.get("/api/read-weight", async (req, res) => {
 
 router.get("/api/read-tare", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W4_HOST);
+    const weightData = await readWeightFromClient(W4_HOST, W4_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({
