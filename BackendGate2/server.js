@@ -178,6 +178,14 @@ const sapAxiosSupplierMaster = axios.create({
   }
 });
 
+// Small hot-cache for repeated vehicle status checks during scan flow.
+const vehicleStatusCache = new Map();
+const VEHICLE_STATUS_CACHE_TTL_MS = 8000;
+
+function vehicleStatusCacheKey(vehicleNumber) {
+  return String(vehicleNumber || '').trim().toUpperCase();
+}
+
 /* ---------- Utility helpers ---------- */
 
 async function fetchCsrfToken() {
@@ -715,13 +723,36 @@ app.get('/api/transporters', async (req, res) => {
 
 /* GET header Vehicle status IN means need to error */
 app.get('/api/headers/vehiclestatus/:VehicleNumber', async (req, res) => {
-  const VehicleNumber = req.params.VehicleNumber;
+  const VehicleNumber = String(req.params.VehicleNumber || '').trim();
+  if (!VehicleNumber) {
+    return res.status(400).json({ error: 'VehicleNumber is required' });
+  }
+
+  const cacheKey = vehicleStatusCacheKey(VehicleNumber);
+  const now = Date.now();
+  const cached = vehicleStatusCache.get(cacheKey);
+  if (cached && now - cached.ts < VEHICLE_STATUS_CACHE_TTL_MS) {
+    return res.json(cached.payload);
+  }
+
   try {
-    // Do NOT encode here, frontend already encodes the filter
-    const filter = `VehicleNumber eq '${VehicleNumber}'`;
-    const resp = await sapAxios.get(`/YY1_GATEINWARD_OUTWARDDETA?$filter=${filter}&$format=json`);
-    res.json(resp.data);
+    const escapedVehicle = VehicleNumber.replace(/'/g, "''");
+    const select = 'GateEntryNumber,VehicleNumber,VehicleStatus,GateEntryDate,SAP_CreatedDateTime,SAP_LastChangedDateTime';
+    const filter = `VehicleNumber eq '${escapedVehicle}'`;
+    const path = `/YY1_GATEINWARD_OUTWARDDETA?$filter=${filter}&$select=${select}&$orderby=SAP_LastChangedDateTime desc,GateEntryDate desc,GateEntryNumber desc&$top=20&$format=json`;
+
+    const resp = await sapAxios.get(path, { timeout: 2000 });
+    const results = resp?.data?.d?.results || resp?.data?.value || [];
+    const payload = { d: { results } };
+
+    vehicleStatusCache.set(cacheKey, { ts: now, payload });
+    res.json(payload);
   } catch (err) {
+    // Fallback to stale cache for resilience when SAP is briefly slow.
+    const stale = vehicleStatusCache.get(cacheKey);
+    if (stale) {
+      return res.json(stale.payload);
+    }
     console.error(err?.response?.status, err?.response?.data || err.message);
     res.status(err?.response?.status || 500).json({ error: err?.response?.data || err?.message });
   }
@@ -906,7 +937,7 @@ app.post('/api/headers', async (req, res) => {
 
 if (req.body.Indicators === "I") {
  
-      const podetails = "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '"
+  const podetails = "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '"
        + req.body.PurchaseOrderNumber + "'&$format=json";
  
         const podetailsresp = await sapAxios.get(podetails, {
@@ -1290,6 +1321,70 @@ app.post('/api/headers/material/in', async (req, res) => {
 // });
 
 
+/* ==================== WEIGHT DOCUMENTS ENDPOINTS ==================== */
+
+// GET weight documents with filters
+app.get('/api/weightdocs', async (req, res) => {
+  try {
+    const filter = req.query.$filter || '';
+    const format = req.query.$format || 'json';
+    const orderby = req.query.$orderby || '';
+    const top = req.query.$top || '';
+
+    let url = '/YY1_CAPTURINGWEIGHTDETAILS';
+    const params = [];
+    if (filter) params.push(`$filter=${encodeURIComponent(filter)}`);
+    if (orderby) params.push(`$orderby=${encodeURIComponent(orderby)}`);
+    if (top) params.push(`$top=${top}`);
+    params.push(`$format=${format}`);
+
+    url += params.length ? `?${params.join('&')}` : '';
+
+    const resp = await sapAxiosWeight.get(url);
+    res.json(resp.data);
+  } catch (err) {
+    console.error('GET weight documents error', err?.response?.status, err?.response?.data || err?.message);
+    res.status(err?.response?.status || 500).json({ error: err?.response?.data || err?.message });
+  }
+});
+
+// PATCH update weight document by WeightDocNumber or UUID
+app.patch('/api/weightdocs/:id', async (req, res) => {
+  const id = req.params.id;
+  const body = sanitizePayloadForSapServerSide(req.body);
+  try {
+    let uuid = id;
+    // If id is not a UUID, look up by WeightDocNumber
+    if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
+      // Find the record by WeightDocNumber
+      const resp = await sapAxiosWeight.get(`/YY1_CAPTURINGWEIGHTDETAILS?$filter=WeightDocNumber eq '${id}'&$format=json`);
+      const results = resp.data?.d?.results || resp.data?.value || [];
+      if (!results.length) {
+        return res.status(404).json({ error: 'Weight document not found' });
+      }
+      uuid = results[0].SAP_UUID || results[0].UUID || results[0].Guid || results[0].GUID;
+      if (!uuid) {
+        return res.status(400).json({ error: 'UUID not found for this WeightDocNumber' });
+      }
+    }
+    const { token, cookies } = await fetchCsrfTokenWeight();
+    const path = `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`;
+    const patchResp = await sapAxiosWeight.patch(path, body, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': token,
+        Cookie: cookies,
+      },
+      validateStatus: status => status < 500
+    });
+    if (patchResp.status === 204) return res.status(204).send();
+    res.status(patchResp.status).json(patchResp.data);
+  } catch (err) {
+    console.error('PATCH weight document error', err?.response?.status, err?.response?.data || err?.message);
+    res.status(err?.response?.status || 500).json({ error: err?.response?.data || err?.message });
+  }
+});
+
 // PATCH update header Inward and Outward by GateEntryNumber or UUID
 app.patch('/api/headers/:id', async (req, res) => {
   const id = req.params.id;
@@ -1592,6 +1687,33 @@ app.get("/api/header/weightdetails/outward", async (req, res) => {
 
     // Filter only Indicators = "O" (Outward)
     const filteredResults = results.filter((r) => (r.Indicators || "").toUpperCase() === "O");
+
+    // Return latest outward rows first so UI updates target the most recent weight row.
+    const parseSapDateMs = (value) => {
+      if (!value) return 0;
+      if (typeof value === 'string' && value.startsWith('/Date(')) {
+        const match = value.match(/\/Date\((\d+)/);
+        return match ? Number(match[1]) || 0 : 0;
+      }
+      const ms = new Date(value).getTime();
+      return Number.isFinite(ms) ? ms : 0;
+    };
+
+    filteredResults.sort((a, b) => {
+      const aTime = Math.max(
+        parseSapDateMs(a.SAP_LastChangedDateTime),
+        parseSapDateMs(a.SAP_CreatedDateTime)
+      );
+      const bTime = Math.max(
+        parseSapDateMs(b.SAP_LastChangedDateTime),
+        parseSapDateMs(b.SAP_CreatedDateTime)
+      );
+      if (bTime !== aTime) return bTime - aTime;
+
+      const aDoc = Number(String(a.WeightDocNumber || '').replace(/\D/g, '')) || 0;
+      const bDoc = Number(String(b.WeightDocNumber || '').replace(/\D/g, '')) || 0;
+      return bDoc - aDoc;
+    });
 
     return res.json({
       d: {
@@ -2744,14 +2866,55 @@ app.get('/api/purchaseorder/:poNumber', async (req, res) => {
   try {
     const headerPath = `/PurchaseOrder?$filter=PurchaseOrder eq '${poNumber}'&$top=1&$format=json`;
     const itemPath = `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
+    const rfidPath = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
 
-    const [headerResponse, itemResponse] = await Promise.all([
+    const [headerResponse, itemResponse, rfidResponse] = await Promise.all([
       sapAxiosPO.get(headerPath),
-      sapAxiosPO.get(itemPath)
+      sapAxiosPO.get(itemPath),
+      sapAxios.get(rfidPath, {
+        auth: {
+          username: SAP_USER,
+          password: SAP_PASS,
+        },
+      })
     ]);
 
     const headerData = headerResponse.data.value?.[0] || {};
-    const items = itemResponse.data.value || [];
+    const poItems = itemResponse.data.value || [];
+    const rfidItems = rfidResponse?.data?.d?.results || [];
+
+    const descByPoItem = new Map();
+    const descByMaterial = new Map();
+
+    rfidItems.forEach((row) => {
+      const poItem = String(row?.PurchaseOrderItem || '').trim();
+      const material = String(row?.Material || '').trim();
+      const productDescription = String(row?.ProductDescription || row?.['d:ProductDescription'] || '').trim();
+
+      if (poItem && productDescription && !descByPoItem.has(poItem)) {
+        descByPoItem.set(poItem, productDescription);
+      }
+      if (material && productDescription && !descByMaterial.has(material)) {
+        descByMaterial.set(material, productDescription);
+      }
+    });
+
+    const items = poItems.map((item) => {
+      const poItem = String(item?.PurchaseOrderItem || '').trim();
+      const material = String(item?.Material || '').trim();
+
+      const productDescription =
+        descByPoItem.get(poItem) ||
+        descByMaterial.get(material) ||
+        item?.ProductDescription ||
+        item?.PurchaseOrderItemText ||
+        '';
+
+      return {
+        ...item,
+        ProductDescription: productDescription,
+      };
+    });
 
     res.json({
       ...headerData,
@@ -3306,6 +3469,7 @@ app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (re
  
   const deliveryDocument = req.params.deliveryDocument;
   const itemNumber = req.params.itemNumber;
+  console.log("Received PATCH for Outbound Delivery", { deliveryDocument, itemNumber, body: req.body });
  
   const { item, header } = req.body;
  

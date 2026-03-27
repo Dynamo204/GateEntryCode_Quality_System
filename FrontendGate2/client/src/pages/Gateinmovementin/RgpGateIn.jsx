@@ -1,20 +1,83 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchRgpGateEntryByNumber, updateRgpGateEntry } from "../../api";
+import { fetchRgpGateEntryByNumber, fetchRgpLineItems, receiveRgpGateInItems } from "../../api";
 import "./RgpProcess.css";
 import "./CreateHeader.css";
 
 export default function RgpGateIn() {
   const navigate = useNavigate();
+  const formatDateToIST = (value) => {
+    if (!value) return "";
+    try {
+      if (typeof value === "string" && value.startsWith("/Date(")) {
+        const ms = Number(value.replace(/\D/g, ""));
+        if (!Number.isNaN(ms)) {
+          return new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+          }).format(new Date(ms));
+        }
+      }
+      if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          return new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+          }).format(date);
+        }
+      }
+    } catch (_e) {}
+    return String(value);
+  };
+
+  const formatTimeToIST = (value) => {
+    if (!value) return "";
+    try {
+      if (typeof value === "string" && /^PT(\d+H)?(\d+M)?(\d+S)?$/.test(value)) {
+        const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+        const h = String(match?.[1] ? Number(match[1]) : 0).padStart(2, "0");
+        const m = String(match?.[2] ? Number(match[2]) : 0).padStart(2, "0");
+        const s = String(match?.[3] ? Number(match[3]) : 0).padStart(2, "0");
+        return `${h}:${m}:${s}`;
+      }
+      if (typeof value === "string" && value.startsWith("/Date(")) {
+        const ms = Number(value.replace(/\D/g, ""));
+        if (!Number.isNaN(ms)) {
+          return new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+          }).format(new Date(ms));
+        }
+      }
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        return new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }).format(date);
+      }
+    } catch (_e) {}
+    return String(value);
+  };
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [gateEntryNumber, setGateEntryNumber] = useState("");
   const [recordFound, setRecordFound] = useState(false);
-  const [sapUuid, setSapUuid] = useState("");
-  
-  // Header fields - matching RGP Gate Out display
+
   const [formData, setFormData] = useState({
     plant: "",
     vendor: "",
@@ -34,58 +97,69 @@ export default function RgpGateIn() {
     purpose: "",
     remarks: "",
     gateEntryDate: "",
-    inwardTime: ""
+    inwardTime: "",
+    expectedDateOfReturn: ""
   });
 
-  // Table rows with received quantity
   const [tableRows, setTableRows] = useState([]);
 
+  const processClosed = recordFound && tableRows.length > 0 && tableRows.every((row) => Number(row.remainQty || 0) <= 0);
+
   const handleRowChange = (id, field, value) => {
-    setTableRows(prev => 
-      prev.map(row => 
+    setTableRows((prev) =>
+      prev.map((row) =>
         row.id === id ? { ...row, [field]: value } : row
       )
     );
   };
 
-  // Parse SAP date format
+  const getDisplayRemainQty = (row) => {
+    const currentRemain = Number(row.remainQty || 0);
+    const enteredReceived = Number(row.receivedQuantity || 0);
+    if (!enteredReceived) {
+      return currentRemain ? currentRemain.toFixed(2) : String(row.remainQty || "0.00");
+    }
+    return Math.max(currentRemain - enteredReceived, 0).toFixed(2);
+  };
+
   const parseSapDate = (val) => {
-    if (!val) return '';
-    if (typeof val === 'string' && val.startsWith('/Date(')) {
+    if (!val) return "";
+    if (typeof val === "string" && val.startsWith("/Date(")) {
       const match = val.match(/\/Date\(([-\d+]+)(?:[+-]\d+)?\)\//);
       if (match) {
         const millis = parseInt(match[1], 10);
         if (!Number.isNaN(millis)) {
-          return new Date(millis).toISOString().split('T')[0];
+          return new Date(millis).toISOString().split("T")[0];
         }
       }
     }
-    if (typeof val === 'string' && val.length >= 10) {
+    if (typeof val === "string" && val.length >= 10) {
       return val.slice(0, 10);
     }
-    return '';
+    return "";
   };
 
-  // Parse SAP time format (PT15H19M14S) to HH:mm:ss
   const parseSapTime = (val) => {
-    if (!val) return '';
-    if (typeof val === 'string' && val.startsWith('PT')) {
+    if (!val) return "";
+    if (typeof val === "string" && val.startsWith("PT")) {
       const match = val.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
       if (match) {
-        const hours = (match[1] || '0').padStart(2, '0');
-        const minutes = (match[2] || '0').padStart(2, '0');
-        const seconds = (match[3] || '0').padStart(2, '0');
+        const hours = (match[1] || "0").padStart(2, "0");
+        const minutes = (match[2] || "0").padStart(2, "0");
+        const seconds = (match[3] || "0").padStart(2, "0");
         return `${hours}:${minutes}:${seconds}`;
       }
     }
-    if (typeof val === 'string' && /^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+    if (typeof val === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
       return val;
     }
     return val;
   };
 
-  const handleFetchGateEntry = async () => {
-    if (!gateEntryNumber.trim()) {
+  const handleFetchGateEntry = async (entryNumberOverride = gateEntryNumber, options = {}) => {
+    const requestedGateEntryNumber = String(entryNumberOverride || "").trim();
+
+    if (!requestedGateEntryNumber) {
       setError("Please enter Gate Entry Number");
       return;
     }
@@ -96,12 +170,10 @@ export default function RgpGateIn() {
     setRecordFound(false);
 
     try {
-      const response = await fetchRgpGateEntryByNumber(gateEntryNumber.trim());
-      
-      // Handle different response formats
+      const response = await fetchRgpGateEntryByNumber(requestedGateEntryNumber);
+
       let record;
       if (response?.data?.d?.results && Array.isArray(response.data.d.results)) {
-        // OData array format
         if (!response.data.d.results.length) {
           setError("No Gate Entry found with this number");
           setLoading(false);
@@ -109,7 +181,6 @@ export default function RgpGateIn() {
         }
         record = response.data.d.results[0];
       } else if (response?.data?.value && Array.isArray(response.data.value)) {
-        // JSON array format
         if (!response.data.value.length) {
           setError("No Gate Entry found with this number");
           setLoading(false);
@@ -117,10 +188,8 @@ export default function RgpGateIn() {
         }
         record = response.data.value[0];
       } else if (response?.data?.d) {
-        // Single OData object
         record = response.data.d;
       } else if (response?.data) {
-        // Single JSON object
         record = response.data;
       } else {
         setError("Invalid response format from server");
@@ -133,25 +202,11 @@ export default function RgpGateIn() {
         setLoading(false);
         return;
       }
-      
-      // Extract SAP UUID - check multiple possible field names
-      const uuid = record.SAP_UUID || record.ID || record.Guid || record.guid || record.__metadata?.uri?.split("guid'")[1]?.split("'")[0];
-      if (!uuid) {
-        console.error("Record data:", record);
-        setError("Record UUID not found in response");
-        setLoading(false);
-        return;
-      }
-      console.log("Extracted UUID:", uuid);
-      setSapUuid(uuid);
 
-      // Map mode of transport from SAP to display format
-      // SAP stores it as TransportMode, not ModeOfTransport
       let displayMode = record.TransportMode || record.ModeOfTransport || "";
       if (displayMode === "By Hand") displayMode = "Hand";
       if (displayMode === "By Road") displayMode = "Truck";
 
-      // Populate form data with all RGP fields
       setFormData({
         plant: record.Plant || "",
         vendor: record.Vendor || "",
@@ -171,32 +226,30 @@ export default function RgpGateIn() {
         purpose: record.Purpose || "",
         remarks: record.Remarks || "",
         gateEntryDate: parseSapDate(record.GateEntryDate),
-        inwardTime: parseSapTime(record.InwardTime)
+        inwardTime: parseSapTime(record.InwardTime),
+        expectedDateOfReturn: record.Expecteddateofreturn || record["d:Expecteddateofreturn"] || ""
       });
 
-      // Build material rows from the record
-      const materials = [];
-      // First material has no suffix, then Material2, Material3, Material4, Material5
-      for (let i = 0; i <= 4; i++) {
-        const suffix = i === 0 ? '' : (i + 1).toString();
-        const materialCode = record[`Material${suffix}`];
-        const materialDescription = record[`MaterialDescription${suffix}`];
-        const returnableQty = record[`ReturnableQty${suffix}`] || "";
-        const receivedQty = record[`ReceivedQty${suffix}`] || "";
-        
-        if (materialCode || materialDescription) {
-          materials.push({
-            id: i + 1,
-            materialCode: materialCode || "",
-            materialDescription: materialDescription || "",
-            returnableQuantity: returnableQty,
-            receivedQuantity: receivedQty, // Load existing value or allow user input
-            uom: "",
-            approximateValue: "",
-            remarks: ""
-          });
-        }
-      }
+      const itemsResponse = await fetchRgpLineItems(requestedGateEntryNumber);
+      let items = itemsResponse?.data?.items || itemsResponse?.data?.d?.results || itemsResponse?.data || [];
+      if (!Array.isArray(items)) items = [];
+
+      const materials = items
+        .map((item, index) => ({
+          id: index + 1,
+          SAP_UUID: item.SAP_UUID || item.sap_uuid || item.uuid || item["d:SAP_UUID"] || "",
+          materialCode: item.Material || item.material || item["d:Material"] || "",
+          materialDescription: item.MaterialDescription || item.materialDescription || item["d:MaterialDescription"] || "",
+          returnableQuantity: item.ReturnableQty ?? item.returnableQty ?? item["d:ReturnableQty"] ?? "0.00",
+          recivedQty: item.RecivedQty ?? item.recivedQty ?? item.ReceivedQty ?? item.receivedQty ?? item["d:RecivedQty"] ?? item["d:ReceivedQty"] ?? "0.00",
+          remainQty: item.RemainQty ?? item.remainQty ?? item["d:RemainQty"] ?? item.ReturnableQty ?? item["d:ReturnableQty"] ?? "0.00",
+          receivedQuantity: "",
+          uom: item.UOM || item.uom || item["d:UOM"] || record.UOM || "",
+          approximateValue: item.ApproximateValue ?? item.approximateValue ?? item["d:ApproximateValue"] ?? record.ApproximateValue ?? "",
+          remarks: item.Remarks || item.remarks || item["d:Remarks"] || record.Remarks || "",
+          purpose: item.Purpose || item.purpose || item["d:Purpose"] || record.Purpose || "",
+        }))
+        .filter((item) => item.materialCode || item.materialDescription);
 
       if (materials.length === 0) {
         setError("No materials found in this Gate Entry");
@@ -206,8 +259,16 @@ export default function RgpGateIn() {
 
       setTableRows(materials);
       setRecordFound(true);
-      setSuccess("Gate Entry loaded successfully! Please enter Received Quantities.");
+      setGateEntryNumber(requestedGateEntryNumber);
 
+      const allClosed = materials.every((item) => Number(item.remainQty || 0) <= 0);
+      if (options.successMessage) {
+        setSuccess(options.successMessage);
+      } else if (allClosed) {
+        setSuccess("Gate Entry process is closed. All quantities are received.");
+      } else {
+        setSuccess("Gate Entry loaded successfully! Please enter Received Quantities.");
+      }
     } catch (err) {
       console.error("Failed to fetch gate entry:", err);
       setError(err?.response?.data?.error?.message?.value || err?.message || "Failed to fetch Gate Entry");
@@ -221,67 +282,50 @@ export default function RgpGateIn() {
     setError("");
     setSuccess("");
 
-    // Validate received quantities
-    const hasReceivedQty = tableRows.some(row => row.receivedQuantity && parseFloat(row.receivedQuantity) > 0);
-    if (!hasReceivedQty) {
+    if (processClosed) {
+      setError("Gate Entry process is closed. All quantities are received.");
+      return;
+    }
+
+    const rowsToReceive = tableRows.filter((row) => Number(row.receivedQuantity || 0) > 0);
+    if (!rowsToReceive.length) {
       setError("Please enter at least one Received Quantity");
+      return;
+    }
+
+    const invalidRow = rowsToReceive.find((row) => Number(row.receivedQuantity || 0) > Number(row.remainQty || 0));
+    if (invalidRow) {
+      setError(`Received Quantity cannot exceed Remaining Quantity for material ${invalidRow.materialCode}`);
       return;
     }
 
     setSaving(true);
 
     try {
-      // Prepare payload with correct SAP field names (ReceivedQty, not ReceivedQuantity)
-      const payload = {};
-      
-      tableRows.forEach((row, index) => {
-        const suffix = index === 0 ? '' : (index + 1).toString();
-        if (row.receivedQuantity) {
-          // SAP field is ReceivedQty (not ReceivedQuantity)
-          payload[`ReceivedQty${suffix}`] = row.receivedQuantity;
-        }
-      });
+      const payload = {
+        items: rowsToReceive.map((row) => ({
+          SAP_UUID: row.SAP_UUID,
+          materialCode: row.materialCode,
+          materialDescription: row.materialDescription,
+          returnableQuantity: row.returnableQuantity,
+          remainQty: row.remainQty,
+          receivedQuantity: row.receivedQuantity,
+          uom: row.uom,
+          approximateValue: row.approximateValue,
+          remarks: row.remarks,
+          purpose: row.purpose,
+        }))
+      };
 
-      console.log("Updating RGP Gate In with payload:", payload);
+      const response = await receiveRgpGateInItems(gateEntryNumber.trim(), payload);
+      const saveMessage = response?.data?.processClosed
+        ? "All quantities are received. Gate Entry process is closed."
+        : "Received quantities saved successfully!";
 
-      // Update the gate entry with received quantities
-      await updateRgpGateEntry(sapUuid, payload);
-      
-      setSuccess("Received quantities saved successfully!");
-      
-      // Reset after 2 seconds
-      setTimeout(() => {
-        setFormData({
-          plant: "",
-          vendor: "",
-          vendorName: "",
-          department: "",
-          requisitioner: "",
-          place: "",
-          modeOfTransport: "",
-          vehicleNumber: "",
-          transporterCode: "",
-          transporterName: "",
-          driverName: "",
-          driverPhoneNumber: "",
-          dlNumber: "",
-          uom: "",
-          approximateValue: "",
-          purpose: "",
-          remarks: "",
-          gateEntryDate: "",
-          inwardTime: ""
-        });
-        setTableRows([]);
-        setGateEntryNumber("");
-        setRecordFound(false);
-        setSapUuid("");
-        setSuccess("");
-      }, 2000);
-
+      await handleFetchGateEntry(gateEntryNumber.trim(), { successMessage: saveMessage });
     } catch (err) {
       console.error("Failed to save received quantities:", err);
-      setError(err?.response?.data?.error?.message?.value || err?.message || "Failed to save received quantities");
+      setError(err?.response?.data?.error?.message?.value || err?.response?.data?.error || err?.message || "Failed to save received quantities");
     } finally {
       setSaving(false);
     }
@@ -290,358 +334,158 @@ export default function RgpGateIn() {
   return (
     <div className="rgp-container">
       <div className="rgp-header">
-        <h2>RGP Gate In - Receive Materials</h2>
+        <h2>RGP Gate In</h2>
       </div>
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      <div className="action-section" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+        <input
+          type="text"
+          value={gateEntryNumber}
+          onChange={(e) => setGateEntryNumber(e.target.value)}
+          className="input-field"
+          style={{ width: "160px", flex: "0 0 160px" }}
+          placeholder="Gate Entry No"
+          disabled={recordFound}
+        />
+        <button
+          type="button"
+          onClick={() => handleFetchGateEntry()}
+          disabled={loading || !gateEntryNumber || recordFound}
+          className="submit-btn"
+          style={{ height: "36px", minWidth: "120px", marginBottom: "0" }}
+        >
+          {loading ? "Loading..." : recordFound ? "Loaded" : "Fetch Entry"}
+        </button>
+      </div>
 
-      {success && (
-        <div className="success-message">
-          {success}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "10px", marginBottom: "10px" }}>
+        <div className="form-group" style={{ marginBottom: "0" }}>
+          <label className="form-label" style={{ marginBottom: "2px" }}>Plant</label>
+          <input type="text" className="form-input" value={formData.plant || ""} readOnly style={{ backgroundColor: "#f0f0f0", marginBottom: "0" }} />
         </div>
-      )}
+        <div className="form-group" style={{ marginBottom: "0" }}>
+          <label className="form-label" style={{ marginBottom: "2px" }}>Vendor</label>
+          <input type="text" className="form-input" value={formData.vendor || ""} readOnly style={{ backgroundColor: "#f0f0f0", marginBottom: "0" }} />
+        </div>
+        <div className="form-group" style={{ marginBottom: "0" }}>
+          <label className="form-label" style={{ marginBottom: "2px" }}>Vehicle Number</label>
+          <input type="text" className="form-input" value={formData.vehicleNumber || ""} readOnly style={{ backgroundColor: "#f0f0f0", marginBottom: "0" }} />
+        </div>
+        <div className="form-group" style={{ marginBottom: "0" }}>
+          <label className="form-label" style={{ marginBottom: "2px" }}>Inward Time</label>
+          <input type="text" className="form-input" value={formatTimeToIST(formData.inwardTime || "")} readOnly style={{ backgroundColor: "#f0f0f0", marginBottom: "0" }} />
+        </div>
+        <div className="form-group" style={{ marginBottom: "0" }}>
+          <label className="form-label" style={{ marginBottom: "2px" }}>Expected Date of Return</label>
+          <input type="text" className="form-input" value={formatDateToIST(formData.expectedDateOfReturn || "")} readOnly style={{ backgroundColor: "#f0f0f0", marginBottom: "0" }} />
+        </div>
+      </div>
 
-      <form onSubmit={handleSave} className="rgp-form">
-        {/* Gate Entry Number Search */}
-        <div className="header-section">
-          <h3>Search Gate Entry</h3>
-          <div className="form-grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+      {loading && <div className="loading-indicator">Loading...</div>}
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+
+      {recordFound && (
+        <div className="rgp-entry-details">
+          <div className="details-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "12px", marginBottom: "16px" }}>
             <div className="form-group">
-              <label>Gate Entry Number <span className="required">*</span></label>
-              <input
-                type="text"
-                value={gateEntryNumber}
-                onChange={(e) => setGateEntryNumber(e.target.value)}
-                placeholder="Enter Gate Entry Number"
-                disabled={recordFound}
-              />
+              <label className="form-label">Gate Entry Number</label>
+              <input type="text" className="form-input" value={gateEntryNumber} readOnly style={{ backgroundColor: "#f0f0f0" }} />
             </div>
-            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button 
-                type="button" 
-                onClick={handleFetchGateEntry} 
-                className="submit-btn"
-                disabled={loading || recordFound}
-                style={{ width: '100%' }}
-              >
-                {loading ? "Loading..." : recordFound ? "Loaded" : "Fetch Gate Entry"}
-              </button>
+            <div className="form-group">
+              <label className="form-label">Remarks</label>
+              <input type="text" className="form-input" value={formData.remarks || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Requisitioner</label>
+              <input type="text" className="form-input" value={formData.requisitioner || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Transport Mode</label>
+              <input type="text" className="form-input" value={formData.modeOfTransport || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Department</label>
+              <input type="text" className="form-input" value={formData.department || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} />
             </div>
           </div>
+
+          <h3>Line Items</h3>
+          <div className="table-section">
+            <table className="rgp-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Material Code</th>
+                  <th>Description</th>
+                  <th>Recived Qty</th>
+                  <th>Remain Qty</th>
+                  <th>Returnable Qty</th>
+                  <th>UOM</th>
+                  <th>Approx. Value</th>
+                  <th>Remarks</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((row, idx) => (
+                  <tr key={row.id || idx}>
+                    <td>{idx + 1}</td>
+                    <td>{row.materialCode}</td>
+                    <td>{row.materialDescription}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.receivedQuantity}
+                        onChange={(e) => handleRowChange(row.id, "receivedQuantity", e.target.value)}
+                        disabled={processClosed || Number(row.remainQty || 0) <= 0}
+                        style={{ width: "80px", textAlign: "right", backgroundColor: processClosed || Number(row.remainQty || 0) <= 0 ? "#f0f0f0" : "#fffbf0", fontWeight: "bold" }}
+                      />
+                    </td>
+                    <td>{getDisplayRemainQty(row)}</td>
+                    <td>{row.returnableQuantity}</td>
+                    <td>{row.uom}</td>
+                    <td>{row.approximateValue}</td>
+                    <td>{row.remarks}</td>
+                    <td>{row.purpose}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+            <button type="button" onClick={handleSave} disabled={saving || processClosed} className="submit-btn">
+              {saving ? "Saving..." : "Save Gate In"}
+            </button>
+            {/* <button
+              type="button"
+              onClick={() => {
+                setFormData({
+                  plant: "", vendor: "", vendorName: "", department: "", requisitioner: "", place: "",
+                  modeOfTransport: "", vehicleNumber: "", transporterCode: "", transporterName: "",
+                  driverName: "", driverPhoneNumber: "", dlNumber: "", uom: "", approximateValue: "",
+                  purpose: "", remarks: "", gateEntryDate: "", inwardTime: "", expectedDateOfReturn: ""
+                });
+                setTableRows([]);
+                setGateEntryNumber("");
+                setRecordFound(false);
+                setError("");
+                setSuccess("");
+              }}
+              className="cancel-btn"
+              disabled={saving}
+            >
+              Reset
+            </button>
+            <button type="button" onClick={() => navigate("/home/rgp")} className="cancel-btn" disabled={saving}>
+              Back
+            </button> */}
+          </div>
         </div>
-
-        {/* Header Information - Read Only */}
-        {recordFound && (
-          <>
-            <div className="header-section">
-              <h3>Header Information (Read-Only)</h3>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Plant</label>
-                  <input
-                    type="text"
-                    value={formData.plant}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Vendor</label>
-                  <input
-                    type="text"
-                    value={formData.vendor}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Vendor Name</label>
-                  <input
-                    type="text"
-                    value={formData.vendorName}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Department</label>
-                  <input
-                    type="text"
-                    value={formData.department}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Requisitioner</label>
-                  <input
-                    type="text"
-                    value={formData.requisitioner}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Place</label>
-                  <input
-                    type="text"
-                    value={formData.place}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Mode of Transport</label>
-                  <input
-                    type="text"
-                    value={formData.modeOfTransport}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Gate Entry Date</label>
-                  <input
-                    type="date"
-                    value={formData.gateEntryDate}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Inward Time</label>
-                  <input
-                    type="text"
-                    value={formData.inwardTime}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>UOM</label>
-                  <input
-                    type="text"
-                    value={formData.uom}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Approximate Value</label>
-                  <input
-                    type="text"
-                    value={formData.approximateValue}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Purpose</label>
-                  <input
-                    type="text"
-                    value={formData.purpose}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-
-                {formData.modeOfTransport === "Truck" && (
-                  <>
-                    <div className="form-group">
-                      <label>Vehicle Number</label>
-                      <input
-                        type="text"
-                        value={formData.vehicleNumber}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Transporter Code</label>
-                      <input
-                        type="text"
-                        value={formData.transporterCode}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Transporter Name</label>
-                      <input
-                        type="text"
-                        value={formData.transporterName}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Driver Name</label>
-                      <input
-                        type="text"
-                        value={formData.driverName}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Driver Phone Number</label>
-                      <input
-                        type="text"
-                        value={formData.driverPhoneNumber}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>DL Number</label>
-                      <input
-                        type="text"
-                        value={formData.dlNumber}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="form-group full-width">
-                  <label>Remarks / Purpose</label>
-                  <input
-                    type="text"
-                    value={formData.remarks}
-                    readOnly
-                    style={{ backgroundColor: '#f0f0f0' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Material Table with Received Quantity */}
-            <div className="table-section">
-              <h3>Material Details - Enter Received Quantities</h3>
-              <div className="table-wrapper">
-                <table className="rgp-table">
-                  <thead>
-                    <tr>
-                      <th>Material Code</th>
-                      <th>Material Description</th>
-                      <th>Returnable Qty</th>
-                      <th>Received Qty <span className="required">*</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.map((row) => (
-                      <tr key={row.id}>
-                        <td>
-                          <input
-                            type="text"
-                            value={row.materialCode}
-                            readOnly
-                            style={{ backgroundColor: '#f0f0f0' }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={row.materialDescription}
-                            readOnly
-                            style={{ backgroundColor: '#f0f0f0' }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={row.returnableQuantity}
-                            readOnly
-                            style={{ backgroundColor: '#f0f0f0' }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={row.receivedQuantity}
-                            onChange={(e) => handleRowChange(row.id, "receivedQuantity", e.target.value)}
-                            placeholder="Enter Qty"
-                            step="0.01"
-                            min="0"
-                            style={{ backgroundColor: '#fffbf0', fontWeight: 'bold' }}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="action-buttons">
-              <button type="submit" className="submit-btn" disabled={saving}>
-                {saving ? "Saving..." : "Save Received Quantities"}
-              </button>
-              <button 
-                type="button" 
-                onClick={() => {
-                  setFormData({
-                    plant: "",
-                    vendor: "",
-                    vendorName: "",
-                    modeOfTransport: "",
-                    vehicleNumber: "",
-                    transporterCode: "",
-                    transporterName: "",
-                    driverName: "",
-                    driverPhoneNumber: "",
-                    dlNumber: "",
-                    remarks: "",
-                    gateEntryDate: "",
-                    inwardTime: ""
-                  });
-                  setTableRows([]);
-                  setGateEntryNumber("");
-                  setRecordFound(false);
-                  setSapUuid("");
-                  setError("");
-                  setSuccess("");
-                }} 
-                className="cancel-btn"
-                disabled={saving}
-              >
-                Reset
-              </button>
-              <button 
-                type="button" 
-                onClick={() => navigate("/home/rgp")} 
-                className="cancel-btn"
-                disabled={saving}
-              >
-                Back
-              </button>
-            </div>
-          </>
-        )}
-      </form>
+      )}
     </div>
   );
 }

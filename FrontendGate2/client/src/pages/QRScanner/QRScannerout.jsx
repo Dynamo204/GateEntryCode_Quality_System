@@ -105,6 +105,7 @@ export default function CreateHeader() {
   const transporterSearchTimeoutRef = useRef(null);
   const permitLookupTimeoutRef = useRef(null);
   const poLookupTimeoutRef = useRef(null);
+  const lookupRequestRef = useRef(0);
 
   const location = useLocation();
   const pathTail = location.pathname.split("/").pop();
@@ -115,6 +116,14 @@ export default function CreateHeader() {
     const normalized = String(value).replace(/,/g, '').trim();
     const n = Number(normalized);
     return Number.isFinite(n) ? n : null;
+  };
+
+  const extractResults = (payload) => {
+    const data = payload?.data ?? payload;
+    if (Array.isArray(data?.d?.results)) return data.d.results;
+    if (Array.isArray(data?.value)) return data.value;
+    if (Array.isArray(data?.results)) return data.results;
+    return [];
   };
 
   const getRecordTimestamp = (record) => {
@@ -137,6 +146,8 @@ export default function CreateHeader() {
     const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
   };
+
+  const isCancelledStatus = (value) => String(value || '').trim().toUpperCase() === 'CANCELLED';
 
   const pickBestWeightRecord = (records, preferredWeightDocNumber = '') => {
     if (!Array.isArray(records) || records.length === 0) return null;
@@ -187,6 +198,20 @@ export default function CreateHeader() {
       if (!value) return fallback;
       const raw = String(value).trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+      // SAP OData V2 date format: /Date(1710115200000)/
+      const sapMatch = raw.match(/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/);
+      if (sapMatch) {
+        const ms = Number(sapMatch[1]);
+        if (Number.isFinite(ms)) {
+          const d = new Date(ms);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
+      }
+
       const part = raw.split('T')[0];
       return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : fallback;
     };
@@ -253,11 +278,21 @@ export default function CreateHeader() {
         VendorInvoiceNumber3: toFieldString(record.VendorInvoiceNumber3, prev.VendorInvoiceNumber3),
         VendorInvoiceNumber4: toFieldString(record.VendorInvoiceNumber4, prev.VendorInvoiceNumber4),
         VendorInvoiceNumber5: toFieldString(record.VendorInvoiceNumber5, prev.VendorInvoiceNumber5),
-        VendorInvoiceDate: toInputDate(firstDefinedValue(record.VendorInvoiceDate, record.GateEntryDate, parsedRemarks.VendorInvoiceDate), prev.VendorInvoiceDate),
-        VendorInvoiceDate2: toInputDate(record.VendorInvoiceDate2, prev.VendorInvoiceDate2),
-        VendorInvoiceDate3: toInputDate(record.VendorInvoiceDate3, prev.VendorInvoiceDate3),
-        VendorInvoiceDate4: toInputDate(record.VendorInvoiceDate4, prev.VendorInvoiceDate4),
-        VendorInvoiceDate5: toInputDate(record.VendorInvoiceDate5, prev.VendorInvoiceDate5),
+        VendorInvoiceDate: toInputDate(
+          firstDefinedValue(
+            record.VendorInvoiceDate,
+            record["d:VendorInvoiceDate"],
+            record.HeaderVendorInvoiceDate,
+            record["d:HeaderVendorInvoiceDate"],
+            record.GateEntryDate,
+            parsedRemarks.VendorInvoiceDate
+          ),
+          prev.VendorInvoiceDate
+        ),
+        VendorInvoiceDate2: toInputDate(firstDefinedValue(record.VendorInvoiceDate2, record["d:VendorInvoiceDate2"]), prev.VendorInvoiceDate2),
+        VendorInvoiceDate3: toInputDate(firstDefinedValue(record.VendorInvoiceDate3, record["d:VendorInvoiceDate3"]), prev.VendorInvoiceDate3),
+        VendorInvoiceDate4: toInputDate(firstDefinedValue(record.VendorInvoiceDate4, record["d:VendorInvoiceDate4"]), prev.VendorInvoiceDate4),
+        VendorInvoiceDate5: toInputDate(firstDefinedValue(record.VendorInvoiceDate5, record["d:VendorInvoiceDate5"]), prev.VendorInvoiceDate5),
         VendorInvoiceWeight: toFieldString(firstDefinedValue(record.VendorInvoiceWeight, parsedRemarks.VendorInvoiceWeight, record.GrossWeight), prev.VendorInvoiceWeight),
         VendorInvoiceWeight2: toFieldString(record.VendorInvoiceWeight2, prev.VendorInvoiceWeight2),
         VendorInvoiceWeight3: toFieldString(record.VendorInvoiceWeight3, prev.VendorInvoiceWeight3),
@@ -281,7 +316,7 @@ export default function CreateHeader() {
         grade: context?.grade,
         includeOut: true,
       });
-      const records = resp.data?.d?.results || [];
+      const records = extractResults(resp);
 
       const scannedVehicle = normalizeToken(context?.vehicleNumber);
       const scannedPermit = normalizeToken(context?.permitNumber);
@@ -357,6 +392,8 @@ export default function CreateHeader() {
   };
 
   const fetchOutDataByGateEntryNumber = async (gateEntryNumber) => {
+    const requestId = ++lookupRequestRef.current;
+    const isActiveRequest = () => requestId === lookupRequestRef.current;
     const normalizeToken = (value) => String(value || '').trim().toUpperCase();
     const toFieldString = (value, fallback = '') => {
       if (value === null || value === undefined || value === '') return fallback;
@@ -373,6 +410,20 @@ export default function CreateHeader() {
       if (!value) return fallback;
       const raw = String(value).trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+      // SAP OData V2 date format: /Date(1710115200000)/
+      const sapMatch = raw.match(/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/);
+      if (sapMatch) {
+        const ms = Number(sapMatch[1]);
+        if (Number.isFinite(ms)) {
+          const d = new Date(ms);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
+      }
+
       const part = raw.split('T')[0];
       return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : fallback;
     };
@@ -439,11 +490,21 @@ export default function CreateHeader() {
         VendorInvoiceNumber3: toFieldString(record.VendorInvoiceNumber3, prev.VendorInvoiceNumber3),
         VendorInvoiceNumber4: toFieldString(record.VendorInvoiceNumber4, prev.VendorInvoiceNumber4),
         VendorInvoiceNumber5: toFieldString(record.VendorInvoiceNumber5, prev.VendorInvoiceNumber5),
-        VendorInvoiceDate: toInputDate(firstDefinedValue(record.VendorInvoiceDate, record.GateEntryDate, parsedRemarks.VendorInvoiceDate), prev.VendorInvoiceDate),
-        VendorInvoiceDate2: toInputDate(record.VendorInvoiceDate2, prev.VendorInvoiceDate2),
-        VendorInvoiceDate3: toInputDate(record.VendorInvoiceDate3, prev.VendorInvoiceDate3),
-        VendorInvoiceDate4: toInputDate(record.VendorInvoiceDate4, prev.VendorInvoiceDate4),
-        VendorInvoiceDate5: toInputDate(record.VendorInvoiceDate5, prev.VendorInvoiceDate5),
+        VendorInvoiceDate: toInputDate(
+          firstDefinedValue(
+            record.VendorInvoiceDate,
+            record["d:VendorInvoiceDate"],
+            record.HeaderVendorInvoiceDate,
+            record["d:HeaderVendorInvoiceDate"],
+            record.GateEntryDate,
+            parsedRemarks.VendorInvoiceDate
+          ),
+          prev.VendorInvoiceDate
+        ),
+        VendorInvoiceDate2: toInputDate(firstDefinedValue(record.VendorInvoiceDate2, record["d:VendorInvoiceDate2"]), prev.VendorInvoiceDate2),
+        VendorInvoiceDate3: toInputDate(firstDefinedValue(record.VendorInvoiceDate3, record["d:VendorInvoiceDate3"]), prev.VendorInvoiceDate3),
+        VendorInvoiceDate4: toInputDate(firstDefinedValue(record.VendorInvoiceDate4, record["d:VendorInvoiceDate4"]), prev.VendorInvoiceDate4),
+        VendorInvoiceDate5: toInputDate(firstDefinedValue(record.VendorInvoiceDate5, record["d:VendorInvoiceDate5"]), prev.VendorInvoiceDate5),
         VendorInvoiceWeight: toFieldString(firstDefinedValue(record.VendorInvoiceWeight, parsedRemarks.VendorInvoiceWeight, record.GrossWeight), prev.VendorInvoiceWeight),
         VendorInvoiceWeight2: toFieldString(record.VendorInvoiceWeight2, prev.VendorInvoiceWeight2),
         VendorInvoiceWeight3: toFieldString(record.VendorInvoiceWeight3, prev.VendorInvoiceWeight3),
@@ -463,21 +524,35 @@ export default function CreateHeader() {
         fetchGateEntryByNumber(gateEntryNumber),
       ]);
 
-      const weightRecords = weightResp?.data?.d?.results || [];
-      const headerRecords = headerResp?.data?.d?.results || headerResp?.data?.value || [];
+      const weightRecords = extractResults(weightResp);
+      const headerRecords = extractResults(headerResp);
       const gateHeader = Array.isArray(headerRecords) ? headerRecords[0] : null;
 
       const weightRecord = pickBestWeightRecord(weightRecords);
       if (!weightRecord && !gateHeader) {
-        setSelectedInboundRecord(null);
-        setError('No record found for this Gate Entry Number');
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError('No record found for this Gate Entry Number');
+        }
+        return;
+      }
+
+      const headerStatus = gateHeader?.Status || gateHeader?.['d:Status'] || '';
+      const weightStatus = weightRecord?.Status || weightRecord?.['d:Status'] || '';
+      if (isCancelledStatus(headerStatus) || isCancelledStatus(weightStatus)) {
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Gate Entry ${gateEntryNumber} is cancelled. Please scan a valid slip.`);
+        }
         return;
       }
 
       const vehicleStatus = normalizeToken(gateHeader?.VehicleStatus || weightRecord?.VehicleStatus);
       if (vehicleStatus === 'OUT') {
-        setSelectedInboundRecord(null);
-        setError(`Vehicle already OUT for Gate Entry ${gateEntryNumber}`);
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Vehicle already OUT for Gate Entry ${gateEntryNumber}`);
+        }
         return;
       }
 
@@ -497,12 +572,15 @@ export default function CreateHeader() {
         NetWeight: weightRecord?.NetWeight ?? gateHeader?.NetWeight,
       };
 
+      if (!isActiveRequest()) return;
       setSelectedInboundRecord(mergedRecord);
       applyFetchedRecordToHeader(mergedRecord);
       setError(null);
     } catch (err) {
-      setSelectedInboundRecord(null);
-      setError('No record found for this Gate Entry Number');
+      if (isActiveRequest()) {
+        setSelectedInboundRecord(null);
+        setError('No record found for this Gate Entry Number');
+      }
     }
   };
 
@@ -543,37 +621,167 @@ export default function CreateHeader() {
   };
 
   const fetchOutDataByScanCriteria = async (vendorInvoiceNumber, vehicleNumber) => {
+    const requestId = ++lookupRequestRef.current;
+    const isActiveRequest = () => requestId === lookupRequestRef.current;
     const normalizeToken = (value) => String(value || '').trim().toUpperCase();
     const scannedInvoice = normalizeToken(vendorInvoiceNumber);
     const scannedVehicle = normalizeToken(vehicleNumber);
+    const escapeODataValue = (value) => String(value || '').replace(/'/g, "''");
+
+    const precheckVehicleStatus = async () => {
+      try {
+        const vehicleResp = await checkVehicleStatus(vehicleNumber);
+        const vehicleRecords = vehicleResp?.data?.d?.results || vehicleResp?.data?.value || [];
+        if (!Array.isArray(vehicleRecords) || vehicleRecords.length === 0) {
+          return { block: false };
+        }
+
+        const sortedVehicleRecords = [...vehicleRecords].sort((a, b) => {
+          const tsDiff = getRecordTimestamp(b) - getRecordTimestamp(a);
+          if (tsDiff !== 0) return tsDiff;
+          return getGateEntryNumberRank(b) - getGateEntryNumberRank(a);
+        });
+
+        const latestRecord = sortedVehicleRecords[0];
+        const latestStatus = normalizeToken(latestRecord?.VehicleStatus);
+        if (latestStatus === 'OUT') {
+          const outGateEntry = String(latestRecord?.GateEntryNumber || '').trim();
+          return {
+            block: true,
+            message: `Vehicle already OUT${outGateEntry ? ` for Gate Entry ${outGateEntry}` : ''}`,
+          };
+        }
+
+        return { block: false };
+      } catch (e) {
+        // Ignore pre-check errors and continue with detailed lookup flow.
+        return { block: false };
+      }
+    };
+
+    const tryHeaderFallback = async () => {
+      const safeInvoice = escapeODataValue(vendorInvoiceNumber);
+      const headerResp = await fetchGateEntryByNumber(`$filter=VendorInvoiceNumber eq '${safeInvoice}'`);
+      const headerRecords = extractResults(headerResp);
+
+      if (!Array.isArray(headerRecords) || headerRecords.length === 0) {
+        return false;
+      }
+
+      const vehicleMatchedHeaders = headerRecords.filter((h) => {
+        const recVehicle = normalizeToken(h?.VehicleNumber || h?.['d:VehicleNumber']);
+        return recVehicle && recVehicle === scannedVehicle;
+      });
+
+      if (vehicleMatchedHeaders.length === 0) {
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Vendor Invoice matched, but vehicle ${vehicleNumber} did not match`);
+        }
+        return false;
+      }
+
+      const nonCancelled = vehicleMatchedHeaders.filter((h) => !isCancelledStatus(h?.Status || h?.['d:Status']));
+      if (nonCancelled.length === 0) {
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError('This slip is cancelled. Please scan a valid slip.');
+        }
+        return false;
+      }
+
+      const inStatusHeaders = nonCancelled.filter((h) => normalizeToken(h?.VehicleStatus || h?.['d:VehicleStatus']) === 'IN');
+      if (inStatusHeaders.length === 0) {
+        const outStatusHeader = nonCancelled.find((h) => normalizeToken(h?.VehicleStatus || h?.['d:VehicleStatus']) === 'OUT');
+        if (outStatusHeader) {
+          const outGateEntry = String(outStatusHeader?.GateEntryNumber || outStatusHeader?.['d:GateEntryNumber'] || '').trim();
+          if (isActiveRequest()) {
+            setSelectedInboundRecord(null);
+            setError(`Vehicle already OUT${outGateEntry ? ` for Gate Entry ${outGateEntry}` : ''}`);
+          }
+          return false;
+        }
+
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Matched records are not in IN status for vehicle ${vehicleNumber}`);
+        }
+        return false;
+      }
+
+      const chosenHeader = [...inStatusHeaders].sort((a, b) => {
+        const tsDiff = getRecordTimestamp(b) - getRecordTimestamp(a);
+        if (tsDiff !== 0) return tsDiff;
+        return getGateEntryNumberRank(b) - getGateEntryNumberRank(a);
+      })[0];
+
+      const gateEntryNumber = String(chosenHeader?.GateEntryNumber || chosenHeader?.['d:GateEntryNumber'] || '').trim();
+      if (!gateEntryNumber) {
+        return false;
+      }
+
+      await fetchOutDataByGateEntryNumber(gateEntryNumber);
+      return true;
+    };
 
     if (!scannedInvoice || !scannedVehicle) {
-      setSelectedInboundRecord(null);
-      setError('Scan must include both Vendor Invoice Number and Vehicle Number');
+      if (isActiveRequest()) {
+        setSelectedInboundRecord(null);
+        setError('Scan must include both Vendor Invoice Number and Vehicle Number');
+      }
       return false;
     }
 
     try {
-      const resp = await fetchWeightDetailsByVendorInvoiceNumber(vendorInvoiceNumber, {
+      // Start weight lookup immediately, but do not block fast OUT validation on it.
+      const weightLookupPromise = fetchWeightDetailsByVendorInvoiceNumber(vendorInvoiceNumber, {
         vehicleNumber,
         includeOut: true,
       });
+      const precheck = await precheckVehicleStatus();
 
-      const records = resp?.data?.d?.results || [];
+      if (precheck?.block) {
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(precheck.message);
+        }
+        return false;
+      }
+
+      const resp = await weightLookupPromise;
+
+      const records = extractResults(resp);
       if (!Array.isArray(records) || records.length === 0) {
-        setSelectedInboundRecord(null);
-        setError(`No record found for Vendor Invoice ${vendorInvoiceNumber}`);
+        const resolvedFromHeader = await tryHeaderFallback();
+        if (resolvedFromHeader) return true;
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`No record found for Vendor Invoice ${vendorInvoiceNumber}`);
+        }
         return false;
       }
 
       const invoiceMatched = records.filter((r) => {
-        const recInvoice = normalizeToken(r?.VendorInvoiceNumber || r?.HandInvoiceNumber || r?.SalesDocument);
+        const recInvoice = normalizeToken(
+          r?.VendorInvoiceNumber ||
+          r?.VendorInvoiceNumber2 ||
+          r?.VendorInvoiceNumber3 ||
+          r?.VendorInvoiceNumber4 ||
+          r?.VendorInvoiceNumber5 ||
+          r?.['d:VendorInvoiceNumber'] ||
+          r?.HandInvoiceNumber ||
+          r?.SalesDocument
+        );
         return recInvoice && recInvoice === scannedInvoice;
       });
 
       if (invoiceMatched.length === 0) {
-        setSelectedInboundRecord(null);
-        setError(`Vendor Invoice ${vendorInvoiceNumber} did not match any record`);
+        const resolvedFromHeader = await tryHeaderFallback();
+        if (resolvedFromHeader) return true;
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Vendor Invoice ${vendorInvoiceNumber} did not match any record`);
+        }
         return false;
       }
 
@@ -583,22 +791,39 @@ export default function CreateHeader() {
       });
 
       if (vehicleMatched.length === 0) {
-        setSelectedInboundRecord(null);
-        setError(`Vendor Invoice matched, but vehicle ${vehicleNumber} did not match`);
+        const resolvedFromHeader = await tryHeaderFallback();
+        if (resolvedFromHeader) return true;
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Vendor Invoice matched, but vehicle ${vehicleNumber} did not match`);
+        }
         return false;
       }
 
-      const inStatusRecords = vehicleMatched.filter((r) => normalizeToken(r?.VehicleStatus) === 'IN');
+      const nonCancelledRecords = vehicleMatched.filter((r) => !isCancelledStatus(r?.Status || r?.['d:Status']));
+      if (nonCancelledRecords.length === 0) {
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError('This slip is cancelled. Please scan a valid slip.');
+        }
+        return false;
+      }
+
+      const inStatusRecords = nonCancelledRecords.filter((r) => normalizeToken(r?.VehicleStatus) === 'IN');
       if (inStatusRecords.length === 0) {
         const outStatusRecord = vehicleMatched.find((r) => normalizeToken(r?.VehicleStatus) === 'OUT');
         if (outStatusRecord) {
           const outGateEntry = String(outStatusRecord?.GateEntryNumber || '').trim();
-          setSelectedInboundRecord(null);
-          setError(`Vehicle already OUT${outGateEntry ? ` for Gate Entry ${outGateEntry}` : ''}`);
+          if (isActiveRequest()) {
+            setSelectedInboundRecord(null);
+            setError(`Vehicle already OUT${outGateEntry ? ` for Gate Entry ${outGateEntry}` : ''}`);
+          }
           return false;
         }
-        setSelectedInboundRecord(null);
-        setError(`Matched records are not in IN status for vehicle ${vehicleNumber}`);
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError(`Matched records are not in IN status for vehicle ${vehicleNumber}`);
+        }
         return false;
       }
 
@@ -606,16 +831,20 @@ export default function CreateHeader() {
       const gateEntryNumber = String(chosenRecord?.GateEntryNumber || '').trim();
 
       if (!gateEntryNumber) {
-        setSelectedInboundRecord(null);
-        setError('Matched record has no Gate Entry Number');
+        if (isActiveRequest()) {
+          setSelectedInboundRecord(null);
+          setError('Matched record has no Gate Entry Number');
+        }
         return false;
       }
 
       await fetchOutDataByGateEntryNumber(gateEntryNumber);
       return true;
     } catch (err) {
-      setSelectedInboundRecord(null);
-      setError('Failed to fetch gate entry using scanned Vendor Invoice and Vehicle');
+      if (isActiveRequest()) {
+        setSelectedInboundRecord(null);
+        setError('Failed to fetch gate entry using scanned Vendor Invoice and Vehicle');
+      }
       return false;
     }
   };
@@ -810,12 +1039,14 @@ export default function CreateHeader() {
   }, [header.VendorInvoiceNumber, header.VehicleNumber, header.PermitNumber, header.Material, header.MaterialDescription, scanFetchTick, pageMode]);
 
   // Direct lookup by gate entry number in outward screen.
+  // Skip if selectedInboundRecord is already set — means the scan path already resolved it.
   useEffect(() => {
     if (pageMode !== 'outward') return;
+    if (selectedInboundRecord) return;
     const gateNo = String(header.GateEntryNumber || '').trim();
     if (gateNo.length < 6) return;
     fetchOutDataByGateEntryNumber(gateNo);
-  }, [header.GateEntryNumber, pageMode]);
+  }, [header.GateEntryNumber, pageMode, selectedInboundRecord]);
 
 
 
@@ -945,6 +1176,18 @@ export default function CreateHeader() {
         return;
       }
 
+      if (tareNum === 0 || tareNum < 0) {
+        setError('❌ Tare Weight cannot be zero or negative. Vehicle may not be at the weighbridge. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (!Number.isFinite(grossNum) || grossNum === 0 || grossNum < 0) {
+        setError('❌ Gross Weight must be a valid positive number. Please check the weighbridge reading.');
+        setLoading(false);
+        return;
+      }
+
       if (!Number.isFinite(netNum)) {
         setError('Net Weight is invalid. Please check Gross and Tare weight.');
         setLoading(false);
@@ -1012,6 +1255,10 @@ export default function CreateHeader() {
       if (pageMode === 'outward') {
         const scannedInvoice = String(fields.VendorInvoiceNumber || '').trim();
         const scannedVehicle = String(fields.TruckNumber || '').trim();
+        const currentInvoice = String(header.VendorInvoiceNumber || '').trim();
+        const currentVehicle = String(header.VehicleNumber || '').trim();
+        const effectiveInvoice = scannedInvoice || currentInvoice;
+        const effectiveVehicle = scannedVehicle || currentVehicle;
 
         setHeader((prev) => ({
           ...prev,
@@ -1021,19 +1268,20 @@ export default function CreateHeader() {
           LRGCNumber: fields.mteNumber || prev.LRGCNumber,
         }));
 
-        if (!scannedInvoice) {
+        if (!effectiveInvoice) {
           setSelectedInboundRecord(null);
           setError('Scanned QR does not contain Vendor Invoice Number');
           return;
         }
 
-        if (!scannedVehicle) {
+        if (!effectiveVehicle) {
           setSelectedInboundRecord(null);
           setError('Scanned QR does not contain Vehicle Number');
           return;
         }
 
-        fetchOutDataByScanCriteria(scannedInvoice, scannedVehicle);
+        setError(null);
+        fetchOutDataByScanCriteria(effectiveInvoice, effectiveVehicle);
         return;
       }
 
@@ -1077,11 +1325,159 @@ export default function CreateHeader() {
 
   return (
     <div className="create-header-container">
-      <h2 className="page-title">
-        {pageMode === "inward" ? "Create Gate Entry + Weight (Inward)" : 
-         pageMode === "outward" ? "Create Gate Entry (Outward)" : 
-         "Create Gate Entry + Weight Document"}
-      </h2>
+      {/* ══ ULTRA PREMIUM QR SCANNER BANNER ══ */}
+      <div style={{
+        position: 'relative',
+        borderRadius: '20px',
+        marginBottom: '32px',
+        overflow: 'hidden',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 4px 20px rgba(67,255,142,0.12), inset 0 1px 0 rgba(255,255,255,0.07)',
+      }}>
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#020817 0%,#071a3e 25%,#0a2d6e 50%,#0842a0 70%,#0b5ed7 100%)' }} />
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 120% at 50% -20%,rgba(139,92,246,0.18) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(6,182,212,0.14) 0%,transparent 55%),radial-gradient(ellipse 50% 70% at 0% 100%,rgba(16,185,129,0.1) 0%,transparent 50%)' }} />
+        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(67,255,142,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(67,255,142,0.03) 1px,transparent 1px)', backgroundSize:'32px 32px' }} />
+        <div style={{ position:'absolute', top:'-40%', left:'-10%', width:'40%', height:'200%', background:'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.035) 50%,transparent 60%)', transform:'skewX(-15deg)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', right:'-8px', top:'50%', transform:'translateY(-50%)', opacity:0.045, pointerEvents:'none' }}>
+          <svg viewBox="0 0 80 80" width="108" height="108" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="10" y="10" width="10" height="10" fill="white"/>
+            <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="60" y="10" width="10" height="10" fill="white"/>
+            <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="10" y="60" width="10" height="10" fill="white"/>
+            <rect x="34" y="3" width="6" height="6" fill="white"/><rect x="42" y="3" width="6" height="6" fill="white"/>
+            <rect x="34" y="34" width="6" height="6" fill="white"/><rect x="50" y="42" width="6" height="6" fill="white"/>
+            <rect x="66" y="50" width="6" height="6" fill="white"/><rect x="66" y="66" width="6" height="6" fill="white"/>
+          </svg>
+        </div>
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:'3px', background:'linear-gradient(90deg,#8b5cf6 0%,#06b6d4 20%,#43ff8e 40%,#facc15 60%,#f97316 80%,#ec4899 100%)', boxShadow:'0 0 18px rgba(67,255,142,0.55),0 0 36px rgba(6,182,212,0.28)' }} />
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'2px', background:'linear-gradient(90deg,transparent 0%,#8b5cf6 20%,#06b6d4 40%,#43ff8e 60%,#facc15 80%,transparent 100%)', opacity:0.5 }} />
+        <div style={{ position:'absolute', top:'10px', left:'10px', width:'22px', height:'22px', borderTop:'2px solid #43ff8e', borderLeft:'2px solid #43ff8e', borderRadius:'4px 0 0 0', opacity:0.9 }} />
+        <div style={{ position:'absolute', top:'10px', right:'10px', width:'22px', height:'22px', borderTop:'2px solid #06b6d4', borderRight:'2px solid #06b6d4', borderRadius:'0 4px 0 0', opacity:0.9 }} />
+        <div style={{ position:'absolute', bottom:'10px', left:'10px', width:'22px', height:'22px', borderBottom:'2px solid #06b6d4', borderLeft:'2px solid #06b6d4', borderRadius:'0 0 0 4px', opacity:0.9 }} />
+        <div style={{ position:'absolute', bottom:'10px', right:'10px', width:'22px', height:'22px', borderBottom:'2px solid #43ff8e', borderRight:'2px solid #43ff8e', borderRadius:'0 0 4px 0', opacity:0.9 }} />
+
+        <div style={{ position:'relative', display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'center', gap:'16px', rowGap:'12px', padding:'clamp(16px, 3vw, 22px) clamp(14px, 4vw, 34px)', paddingRight:'clamp(130px, 28vw, 320px)', textAlign:'center' }}>
+          <div style={{ position:'relative', flexShrink:0, width:'72px', height:'72px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ position:'absolute', inset:'-4px', borderRadius:'18px', background:'linear-gradient(135deg,#43ff8e,#06b6d4,#8b5cf6,#43ff8e)', opacity:0.45, filter:'blur(6px)' }} />
+            <div style={{ position:'absolute', inset:0, borderRadius:'16px', padding:'2px', background:'linear-gradient(135deg,#43ff8e 0%,#06b6d4 50%,#8b5cf6 100%)' }}>
+              <div style={{ width:'100%', height:'100%', borderRadius:'14px', background:'#040e24' }} />
+            </div>
+            <div style={{ position:'relative', filter:'drop-shadow(0 0 8px rgba(67,255,142,0.8))' }}>
+              <svg viewBox="0 0 80 80" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="qOutG1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#43ff8e" />
+                    <stop offset="100%" stopColor="#06b6d4" />
+                  </linearGradient>
+                  <linearGradient id="qOutG2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#06b6d4" />
+                    <stop offset="100%" stopColor="#8b5cf6" />
+                  </linearGradient>
+                </defs>
+                <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG1)" strokeWidth="4" />
+                <rect x="10" y="10" width="10" height="10" fill="url(#qOutG1)" />
+                <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG1)" strokeWidth="4" />
+                <rect x="60" y="10" width="10" height="10" fill="url(#qOutG1)" />
+                <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG2)" strokeWidth="4" />
+                <rect x="10" y="60" width="10" height="10" fill="url(#qOutG2)" />
+                <rect x="34" y="3" width="6" height="6" fill="#43ff8e" /><rect x="42" y="3" width="6" height="6" fill="#06b6d4" />
+                <rect x="34" y="11" width="6" height="6" fill="#06b6d4" /><rect x="42" y="11" width="6" height="6" fill="#43ff8e" />
+                <rect x="34" y="19" width="6" height="6" fill="#8b5cf6" />
+                <rect x="3" y="34" width="6" height="6" fill="#43ff8e" /><rect x="11" y="34" width="6" height="6" fill="#06b6d4" /><rect x="19" y="34" width="6" height="6" fill="#43ff8e" />
+                <rect x="34" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="34" width="6" height="6" fill="#43ff8e" />
+                <rect x="50" y="34" width="6" height="6" fill="#06b6d4" /><rect x="58" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="34" width="6" height="6" fill="#43ff8e" />
+                <rect x="3" y="42" width="6" height="6" fill="#06b6d4" /><rect x="19" y="42" width="6" height="6" fill="#8b5cf6" />
+                <rect x="34" y="42" width="6" height="6" fill="#43ff8e" /><rect x="50" y="42" width="6" height="6" fill="#06b6d4" /><rect x="66" y="42" width="6" height="6" fill="#43ff8e" />
+                <rect x="34" y="50" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="50" width="6" height="6" fill="#06b6d4" /><rect x="58" y="50" width="6" height="6" fill="#43ff8e" />
+                <rect x="34" y="58" width="6" height="6" fill="#06b6d4" /><rect x="50" y="58" width="6" height="6" fill="#8b5cf6" />
+                <rect x="34" y="66" width="6" height="6" fill="#43ff8e" /><rect x="42" y="66" width="6" height="6" fill="#06b6d4" />
+                <rect x="58" y="66" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="58" width="6" height="6" fill="#06b6d4" /><rect x="66" y="66" width="6" height="6" fill="#43ff8e" />
+              </svg>
+            </div>
+          </div>
+
+          <div style={{ flex:1, minWidth:'220px', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
+            <div style={{
+              display:'inline-flex', alignItems:'center', gap:'6px',
+              background: pageMode === 'inward'
+                ? 'linear-gradient(90deg, rgba(67,255,142,0.18), rgba(6,182,212,0.12))'
+                : pageMode === 'outward'
+                  ? 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(139,92,246,0.12))'
+                  : 'linear-gradient(90deg, rgba(250,204,21,0.18), rgba(249,115,22,0.12))',
+              border: `1px solid ${pageMode === 'inward' ? 'rgba(67,255,142,0.5)' : pageMode === 'outward' ? 'rgba(6,182,212,0.5)' : 'rgba(250,204,21,0.5)'}`,
+              borderRadius:'30px', padding:'3px 14px', marginBottom:'8px',
+              fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase',
+              color: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
+              boxShadow: pageMode === 'inward' ? '0 0 12px rgba(67,255,142,0.2)' : pageMode === 'outward' ? '0 0 12px rgba(6,182,212,0.2)' : '0 0 12px rgba(250,204,21,0.2)',
+            }}>
+              <span style={{
+                width:'5px', height:'5px', borderRadius:'50%', flexShrink:0,
+                background: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
+                boxShadow: `0 0 6px ${pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15'}`,
+              }} />
+              {pageMode === 'inward' ? '⬇ Inward' : pageMode === 'outward' ? '⬆ Outward' : '⟳ Default'}
+            </div>
+            <h2 style={{
+              margin:0, fontSize:'clamp(1.1rem, 2.7vw, 1.7rem)', fontWeight:800,
+              fontFamily:"'Playfair Display', 'Cormorant Garamond', Georgia, serif",
+              fontStyle:'italic', letterSpacing:'0.01em', lineHeight:1.15,
+              background:'linear-gradient(90deg, #ffffff 0%, #c7f4ff 30%, #43ff8e 60%, #06b6d4 100%)',
+              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+              filter:'drop-shadow(0 2px 12px rgba(67,255,142,0.25))',
+              wordBreak:'break-word',
+            }}>
+              {pageMode === 'inward'
+                ? 'QR Scanner — Gate Entry + Weight'
+                : pageMode === 'outward'
+                  ? 'QR Scanner — Gate Out'
+                  : 'QR Scanner — Gate Entry + Weight Document'}
+            </h2>
+            <div style={{ width:'65%', height:'1px', margin:'8px auto', background:'linear-gradient(90deg, transparent, rgba(67,255,142,0.45), rgba(6,182,212,0.45), rgba(139,92,246,0.3), transparent)' }} />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap' }}>
+              <span style={{ color:'#94d8f8', fontWeight:500, fontSize:'0.83rem', fontFamily:"'Playfair Display', Georgia, serif", letterSpacing:'0.03em', display:'flex', alignItems:'center', gap:'5px' }}>
+                <span>📡</span>
+                Scan QR slip to auto-fill vehicle & invoice details
+              </span>
+              {/* <span style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(6,182,212,0.2))', border:'1px solid rgba(139,92,246,0.45)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#c4b5fd', fontWeight:700, letterSpacing:'0.05em', boxShadow:'0 0 8px rgba(139,92,246,0.15)' }}>
+                
+              </span> */}
+              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', background:'rgba(67,255,142,0.1)', border:'1px solid rgba(67,255,142,0.3)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#43ff8e', fontWeight:700, letterSpacing:'0.06em' }}>
+                <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#43ff8e', boxShadow:'0 0 6px #43ff8e, 0 0 10px rgba(67,255,142,0.6)', display:'inline-block' }} />
+                LIVE
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          position: 'absolute',
+          top: '0',
+          right: '0',
+          bottom: '0',
+          width: 'clamp(120px, 22vw, 240px)',
+          pointerEvents: 'none',
+          opacity: 0.94,
+          display: 'flex',
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
+          overflow: 'hidden',
+        }}>
+          <img
+            src="/ChatGPT%20Image%20Mar%2026,%202026,%2004_04_01%20PM.png"
+            alt="Scanner"
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit: 'cover',
+              objectPosition: 'right center',
+              maskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
+              WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
+            }}
+          />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.type !== 'submit') {
@@ -1090,14 +1486,14 @@ export default function CreateHeader() {
       }}>
         <section className="form-section">
           <h3 className="section-title">Header Information</h3>
-          <div className="grid-3-cols">
+          <div className="grid-7-cols">
             <div className="form-group">
-              <label className="form-label">Gate Entry Number (Auto) *</label>
+              <label className="form-label">Gate Entry Number (Auto)</label>
               <input className="form-input" name="GateEntryNumber" value={header.GateEntryNumber} onChange={handleChange} placeholder="Enter or scan gate entry number" />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Weight Doc Number (Auto)</label>
+              <label className="form-label">Weight Doc(Auto)</label>
               <input className="form-input" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ background: '#f0f0f0' }} />
             </div>
 
@@ -1230,32 +1626,6 @@ export default function CreateHeader() {
               <input className="form-input" name="SubTransporterName" value={header.SubTransporterName} onChange={handleChange} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Tare Weight (MT)</label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input className="form-input" name="TareWeight" value={header.TareWeight} onChange={handleChange} placeholder="0.00" />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleGetTareWeight}
-                  disabled={tareWeightLoading || loading}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  {tareWeightLoading ? 'Getting...' : 'Get Tare'}
-                </button>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Gross Weight (MT)</label>
-              <input className="form-input" name="GrossWeight" value={header.GrossWeight} onChange={handleChange} placeholder="0" />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Net Weight (MT)</label>
-              <input className="form-input" name="NetWeight" value={header.NetWeight} readOnly style={{ background: '#f0f0f0' }} placeholder="30.000" />
-            </div>
-
             <div className="form-group form-group-checkbox">
               <input type="checkbox" className="form-checkbox" name="EWayBill" checked={header.EWayBill} onChange={handleChange} />
               <label className="form-checkbox-label">E-Way Bill</label>
@@ -1287,7 +1657,7 @@ export default function CreateHeader() {
           <h3 className="section-title">Purchase Order Details</h3>
           <div className="po-entry-card">
             <h4 className="po-entry-title">PO Entry</h4>
-            <div className="grid-4-cols">
+            <div className="grid-8-cols">
               <div className="form-group">
                 <label className="form-label">PO Number</label>
                 <input className="form-input" name="PurchaseOrderNumber" value={header["PurchaseOrderNumber"]} onChange={handleChange} />
@@ -1329,6 +1699,53 @@ export default function CreateHeader() {
         </section>
 
         <div className="form-actions">
+          <div className="form-group" style={{ minWidth: '220px', marginBottom: 0 }}>
+            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Tare Weight (MT)</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                className="form-input"
+                name="TareWeight"
+                value={header.TareWeight}
+                readOnly
+                placeholder="0.00"
+                style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleGetTareWeight}
+                disabled={tareWeightLoading || loading}
+                style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
+              >
+                {tareWeightLoading ? 'Getting...' : 'Get Tare'}
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
+            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Gross Weight (MT)</label>
+            <input
+              className="form-input"
+              name="GrossWeight"
+              value={header.GrossWeight}
+              readOnly
+              placeholder="0"
+              style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
+            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Net Weight (MT)</label>
+            <input
+              className="form-input"
+              name="NetWeight"
+              value={header.NetWeight}
+              readOnly
+              placeholder="0.000"
+              style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+            />
+          </div>
+
           <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`}>
             {loading ? "Creating..." : "✅ Create Gate Entry + Weight Document"}
           </button>

@@ -337,17 +337,8 @@ export default function MaterialOutwardTareCapture() {
         NetWeight: payload.NetWeight,
       });
 
-      setResult('Tare Weight captured successfully! Net Weight calculated. Printing...');
-
-      // ✅ AUTO PRINT (same design as SC screen)
-      try { await printPdfSlip(payload); } catch (_) {}
-      
-      // Reset form after success
-      setTimeout(() => {
-        setForm(createInitialState());
-        setRecordFound(false);
-        setLoading(false);
-      }, 2000);
+      setResult('Tare Weight captured successfully! Net Weight calculated.');
+      // No auto print. Show print button after success.
     } catch (err) {
       console.error('Update weight err', err?.response?.data || err.message);
       let msg = err?.response?.data?.error?.message?.value || err?.response?.data?.error || err.message || 'Unknown error';
@@ -519,8 +510,8 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-       //'http://localhost:4600/api/goodsissue-and-invoice-int',
-       'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+       'http://localhost:4600/api/goodsissue-and-invoice-int',
+       //'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
       // 'https://gateentry-backend-latest.onrender.com/api/goodsissue-and-invoice',
   //    'https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/goodsissue-and-invoice',
       { DeliveryDocument: deliveryDoc },
@@ -883,6 +874,26 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
       {result && (
         <div className="success-message">
           <strong>Success:</strong> {result}
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  await printPdfSlip(form);
+                  setResult(r => (r ? r + ' (Slip sent to printer)' : 'Slip sent to printer'));
+                } catch (e) {
+                  setError('Failed to print slip: ' + (e?.message || e));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+            >
+              {loading ? 'Printing...' : 'Print Weight Slip'}
+            </button>
+          </div>
         </div>
       )}
     </div>

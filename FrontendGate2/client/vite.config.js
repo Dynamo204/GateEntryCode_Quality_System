@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     historyApiFallback: true,
     proxy: {
-      '/api': 'http://localhost:4600'
+      '/api': 'https://gateentry.cfapps.in30.hana.ondemand.com'
     }
   }
 })

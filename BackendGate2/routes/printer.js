@@ -10,7 +10,7 @@ const router = express.Router();
 // =======================================================
 // PRINTER CONFIGURATION
 // =======================================================
-const PRINTER_IP   = process.env.PRINTER_HOST || "192.168.10.159";
+const PRINTER_IP   = process.env.PRINTER_HOST || "136.233.76.90";
 const PRINTER_RAW  = parseInt(process.env.PRINTER_RAW_PORT  || "9100", 10);
 const PRINTER_LPR  = parseInt(process.env.PRINTER_LPR_PORT  || "515",  10);
 const PRINTER_QUEUE = process.env.PRINTER_QUEUE || "lp";

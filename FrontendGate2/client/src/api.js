@@ -23,8 +23,8 @@ export function fetchVendorDetails({ code, name }) {
   return api.get(`/rgpprocess/vendors?${params.toString()}`);
 }
 import axios from 'axios';
-export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
-//export const API_BASE = 'http://localhost:4600/api';
+//export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
+export const API_BASE = 'http://localhost:4600/api';
 //export const API_BASE = 'https://gateentry-backend-latest.onrender.com/api';
 const API_TIMEOUT_MS = 120000;
 
@@ -131,7 +131,7 @@ export const fetchGateEntryByNumber = (gateEntryNumberOrFilter) => {
 
 // Vehicle status IN means need to error
 export const checkVehicleStatus = (VehicleNumber) => {
-  return api.get(`/headers/vehiclestatus/${VehicleNumber}`);
+  return api.get(`/headers/vehiclestatus/${encodeURIComponent(VehicleNumber)}`);
 };
 
 // Update header by UUID or GateEntryNumber (backend supports both)
@@ -344,6 +344,10 @@ export function fetchRgpGateEntryByNumber(gateEntryNumber) {
 
 export function updateRgpGateEntry(uuid, payload) {
   return api.patch(`/rgpprocess/${uuid}`, payload);
+}
+
+export function receiveRgpGateInItems(gateEntryNumber, payload) {
+  return api.post(`/rgpprocess/${gateEntryNumber}/receive`, payload);
 }
 
 export function fetchAllRgpGateEntries() {

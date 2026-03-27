@@ -6,7 +6,7 @@ const router = express.Router();
 /* ================= SC OUTWARD HEADER UPDATE ================= */
 router.post("/sc-out", async (req, res) => {
   try {
-    const { GateEntryNumber, OutwardTime, VehicleStatus } = req.body;
+    const { GateEntryNumber, OutwardTime, VehicleStatus, GateOutDate } = req.body;
     if (!GateEntryNumber || !OutwardTime || !VehicleStatus) {
       return res.status(400).json({ error: "Missing GateEntryNumber, OutwardTime, or VehicleStatus" });
     }
@@ -27,6 +27,7 @@ router.post("/sc-out", async (req, res) => {
     const patchBody = {
       VehicleStatus,
       OutwardTime,
+      GateOutDate: `/Date(${new Date(GateOutDate || new Date().toISOString().split("T")[0]).getTime()})/`,
     };
     await sapGate.patch(patchUrl, patchBody, {
       headers: {
@@ -50,12 +51,20 @@ const SAP_GATE_BASE =
 const SAP_PO_BASE =
   "https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
 
+const SAP_VENDOR_BASE =
+  "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
+
 const SAP_GATE_AUTH = {
   username: "BTPINTEGRATION",
   password: "BTPIntegration@1234567890",
 };
 
 const SAP_PO_AUTH = {
+  username: "BTPINTEGRATION",
+  password: "BTPIntegration@1234567890",
+};
+
+const SAP_VENDOR_AUTH = {
   username: "BTPINTEGRATION",
   password: "BTPIntegration@1234567890",
 };
@@ -77,6 +86,13 @@ const sapGate = axios.create({
     Accept: "application/json",
     "Content-Type": "application/json",
   },
+});
+
+// Vendor Master (OData V2 – no CSRF needed for reads)
+const sapVendor = axios.create({
+  baseURL: SAP_VENDOR_BASE,
+  auth: SAP_VENDOR_AUTH,
+  headers: { Accept: "application/json" },
 });
 
 /* ================= CSRF ================= */
@@ -117,21 +133,38 @@ router.get("/po-details", async (req, res) => {
   try {
     const { poNumber } = req.query;
 
-    const poItems = await sapPO.get(
-      `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'`
-    );
+    // Fetch PO header (for Supplier), PO items, and already-used quantities in parallel
+    const [poHeaderResp, poItemsResp, usedResp] = await Promise.all([
+      sapPO.get(`/PurchaseOrder?$filter=PurchaseOrder eq '${poNumber}'&$select=PurchaseOrder,Supplier`),
+      sapPO.get(`/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'`),
+      sapGate.get(`/YY1_GATEENTRYITEMS_GATEINWA000?$filter=PurchaseOrderNumber eq '${poNumber}'`),
+    ]);
 
-    const used = await sapGate.get(
-      `/YY1_GATEENTRYITEMS_GATEINWA000?$filter=PurchaseOrderNumber eq '${poNumber}'`
-    );
+    // Extract Supplier from PO header
+    const supplier = poHeaderResp.data?.value?.[0]?.Supplier || "";
+
+    // Fetch Vendor Name from Vendor Master if supplier exists
+    let vendorName = "";
+    if (supplier) {
+      try {
+        const vendorResp = await sapVendor.get(
+          `/YY1_Vendor_Master?$filter=Supplier eq '${supplier}'&$select=Supplier,SupplierName&$format=json`
+        );
+        vendorName = vendorResp.data?.d?.results?.[0]?.SupplierName || "";
+      } catch (vendorErr) {
+        console.error("VENDOR MASTER ERROR:", vendorErr.response?.data || vendorErr.message);
+      }
+    }
 
     const usedMap = {};
-    used.data.d.results.forEach((i) => {
+    usedResp.data.d.results.forEach((i) => {
       usedMap[i.PurchaseOrderItem] = Number(i.RemainQty);
     });
 
     res.json({
-      items: poItems.data.value.map((i) => ({
+      vendor: supplier,
+      vendorName,
+      items: poItemsResp.data.value.map((i) => ({
         PurchaseOrderItem: i.PurchaseOrderItem,
         Material: i.Material,
         MaterialDescription: i.PurchaseOrderItemText,
@@ -140,6 +173,8 @@ router.get("/po-details", async (req, res) => {
           usedMap[i.PurchaseOrderItem] !== undefined
             ? usedMap[i.PurchaseOrderItem]
             : Number(i.OrderQuantity),
+        Vendor: supplier,
+        VendorName: vendorName,
       })),
     });
   } catch (err) {
@@ -171,6 +206,38 @@ function computeNextGateEntryNumber(prefix, latest) {
   const suffix = latest.slice(prefix.length);
   const next = (parseInt(suffix, 10) || 0) + 1;
   return prefix + String(next).padStart(7, "0");
+}
+
+function toSapDurationTime(value) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    // Already in SAP duration format
+    if (/^PT\d{2}H\d{2}M\d{2}S$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    // Accept HH:mm or HH:mm:ss from UI and convert
+    const hmsMatch = trimmed.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (hmsMatch) {
+      const [, hh, mm, ss = "00"] = hmsMatch;
+      return `PT${hh}H${mm}M${ss}S`;
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      const hh = String(parsed.getHours()).padStart(2, "0");
+      const mm = String(parsed.getMinutes()).padStart(2, "0");
+      const ss = String(parsed.getSeconds()).padStart(2, "0");
+      return `PT${hh}H${mm}M${ss}S`;
+    }
+  }
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  return `PT${hh}H${mm}M${ss}S`;
 }
 
 router.get("/next-gatenumber-SC", async (req, res) => {
@@ -219,7 +286,7 @@ router.post("/sc", async (req, res) => {
       Indicators: "SC",
       FiscalYear: String(new Date().getFullYear()),
       Division: "01",
-      InwardTime: "PT00H00M00S",
+      InwardTime: toSapDurationTime(req.body.InwardTime),
       SAP_LifecycleStatus: "A",
 
       TransportMode: transportMode,
@@ -227,6 +294,7 @@ router.post("/sc", async (req, res) => {
       VehicleNumber: req.body.VehicleNumber || "",
       TransporterName: req.body.TransporterName || "",
       DriverName: req.body.DriverName || "",
+      HelperName: req.body.HelperName || "",
       DriverPhoneNumber: req.body.DriverPhoneNumber || "",
       DLNumber: req.body.DLNumber || "",
 

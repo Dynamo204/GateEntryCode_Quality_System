@@ -1,6 +1,6 @@
 // Version 6 - Create Gate Entry + Material Inward (Weight Document) together
 import React, { useState, useEffect, useRef } from "react";
-import { createHeader, createMaterialInward, sendEmailNotification, fetchPurchaseOrderByPermitNumber, fetchPurchaseOrderByNumber, transporterDetails, fetchPelletInWeightFromBridge } from "../../api";
+import { createHeader, createMaterialInward, sendEmailNotification, fetchPurchaseOrderByPermitNumber, fetchPurchaseOrderByNumber, transporterDetails, fetchPelletInWeightFromBridge, fetchGateEntryByNumber, fetchWeightDetailsByVendorInvoiceNumber } from "../../api";
 import { useLocation } from "react-router-dom";
 
 export default function CreateHeader() {
@@ -82,6 +82,8 @@ export default function CreateHeader() {
   const [loading, setLoading] = useState(false);
   const [grossWeightLoading, setGrossWeightLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [poApprovalError, setPoApprovalError] = useState(null);
+  const [duplicateMdpError, setDuplicateMdpError] = useState(null);
   const [result, setResult] = useState(null);
   const [transporterDropdown, setTransporterDropdown] = useState({
     show: false,
@@ -92,6 +94,23 @@ export default function CreateHeader() {
   const transporterSearchTimeoutRef = useRef(null);
   const permitLookupTimeoutRef = useRef(null);
   const poLookupTimeoutRef = useRef(null);
+  const duplicateMdpTimeoutRef = useRef(null);
+
+  const normalizeLifecycleStatus = (value) => String(value || '').trim().toUpperCase();
+
+  const isPurchaseOrderApproved = (payload) => {
+    const status = String(
+      payload?.PurchasingProcessingStatus ||
+      payload?.d?.PurchasingProcessingStatus ||
+      payload?.value?.[0]?.PurchasingProcessingStatus ||
+      payload?.items?.[0]?.PurchasingProcessingStatus ||
+      ''
+    ).trim().toUpperCase();
+
+    return status === '05' || status === 'APPROVED';
+  };
+
+  const escapeODataValue = (value) => String(value || '').replace(/'/g, "''");
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -113,6 +132,10 @@ export default function CreateHeader() {
         ...prev,
         [name]: type === "checkbox" ? checked : value
       }));
+    }
+
+    if (name === 'VendorInvoiceNumber') {
+      setDuplicateMdpError(null);
     }
   };
 
@@ -201,10 +224,97 @@ export default function CreateHeader() {
     };
   }, [header.PermitNumber]);
 
+  useEffect(() => {
+    const mdpNumber = String(header.VendorInvoiceNumber || '').trim();
+    if (mdpNumber.length < 3) {
+      setDuplicateMdpError(null);
+      return;
+    }
+
+    let cancelled = false;
+    if (duplicateMdpTimeoutRef.current) {
+      clearTimeout(duplicateMdpTimeoutRef.current);
+    }
+
+    duplicateMdpTimeoutRef.current = setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        const safeMdp = escapeODataValue(mdpNumber);
+        const [gateResponse, weightResponse] = await Promise.all([
+          fetchGateEntryByNumber(`$filter=VendorInvoiceNumber eq '${safeMdp}'`),
+          fetchWeightDetailsByVendorInvoiceNumber(mdpNumber, { includeOut: true })
+        ]);
+
+        const gateResults = gateResponse?.data?.d?.results || gateResponse?.data?.value || [];
+        const weightResults = weightResponse?.data?.d?.results || weightResponse?.data?.value || [];
+
+        const matchingEntries = Array.isArray(gateResults) ? gateResults : [];
+        const matchingWeights = (Array.isArray(weightResults) ? weightResults : []).filter((record) => {
+          const recordMdp = String(
+            record?.VendorInvoiceNumber ||
+            record?.VendorInvoiceNumber2 ||
+            record?.VendorInvoiceNumber3 ||
+            record?.VendorInvoiceNumber4 ||
+            record?.VendorInvoiceNumber5 ||
+            ''
+          ).trim();
+          return recordMdp === mdpNumber;
+        });
+
+        const activeEntry = matchingEntries.find((entry) => {
+          const status = normalizeLifecycleStatus(entry.Status || entry["d:Status"]);
+          return status !== "CANCELLED";
+        });
+
+        const activeWeight = matchingWeights.find((record) => {
+          const status = normalizeLifecycleStatus(record.Status || record["d:Status"]);
+          return status !== "CANCELLED";
+        });
+
+        const cancelledEntryExists = matchingEntries.some((entry) => normalizeLifecycleStatus(entry.Status || entry["d:Status"]) === "CANCELLED");
+        const cancelledWeightExists = matchingWeights.some((record) => normalizeLifecycleStatus(record.Status || record["d:Status"]) === "CANCELLED");
+
+        if (!cancelled && String(header.VendorInvoiceNumber || '').trim() === mdpNumber) {
+          if (activeEntry) {
+            const existingGateEntry = activeEntry.GateEntryNumber || activeEntry["d:GateEntryNumber"] || "";
+            setDuplicateMdpError(
+              `With this MDP Number ${mdpNumber} Gate Entry ${existingGateEntry} already created. Please check slip once.`.trim()
+            );
+          } else if (cancelledEntryExists && activeWeight) {
+            setDuplicateMdpError("Gate Entry was cancelled but Weight Document was not cancelled. Same MDP is not acceptable.");
+          } else if (!cancelledEntryExists && cancelledWeightExists) {
+            setDuplicateMdpError("Weight Document was cancelled but Gate Entry was not cancelled. Same MDP is not acceptable.");
+          } else if (cancelledEntryExists && !cancelledWeightExists) {
+            setDuplicateMdpError("Gate Entry was cancelled but Weight Document was not cancelled. Same MDP is not acceptable.");
+          } else if (cancelledEntryExists && cancelledWeightExists) {
+            setDuplicateMdpError(null);
+          } else {
+            setDuplicateMdpError(null);
+          }
+        }
+      } catch (lookupError) {
+        if (!cancelled) {
+          console.warn('Duplicate MDP lookup failed', header.VendorInvoiceNumber, lookupError);
+          setDuplicateMdpError(null);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      if (duplicateMdpTimeoutRef.current) {
+        clearTimeout(duplicateMdpTimeoutRef.current);
+      }
+    };
+  }, [header.VendorInvoiceNumber]);
+
   // Debounced PO lookup for Division to prevent calls on each keystroke.
   useEffect(() => {
     const poNumber = String(header.PurchaseOrderNumber || '').trim();
-    if (poNumber.length < 5) return;
+    if (poNumber.length < 5) {
+      setPoApprovalError(null);
+      return;
+    }
 
     let cancelled = false;
     if (poLookupTimeoutRef.current) {
@@ -215,7 +325,34 @@ export default function CreateHeader() {
       if (cancelled) return;
       try {
         const resp = await fetchPurchaseOrderByNumber(poNumber);
-        const items = resp?.data?.items || [];
+
+        if (!isPurchaseOrderApproved(resp?.data)) {
+          if (!cancelled) {
+            setPoApprovalError(`PO ${poNumber} is not approved.`);
+            setHeader(prev => (
+              prev.PurchaseOrderNumber === poNumber
+                ? {
+                    ...prev,
+                    Division: '',
+                    Material: '',
+                    MaterialDescription: '',
+                    BalanceQty: ''
+                  }
+                : prev
+            ));
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setPoApprovalError(null);
+        }
+
+        const items =
+          resp?.data?.items ||
+          resp?.data?.d?.results ||
+          resp?.data?.value ||
+          [];
         const firstItem = items[0] || {};
         const plant =
           firstItem.Plant ||
@@ -226,12 +363,37 @@ export default function CreateHeader() {
           resp?.data?.plant ||
           '';
 
-        if (!cancelled && plant) {
-          setHeader(prev => (
-            prev.PurchaseOrderNumber === poNumber
-              ? { ...prev, Division: plant }
-              : prev
-          ));
+        const poMaterial =
+          firstItem.Material ||
+          firstItem["d:Material"] ||
+          resp?.data?.Material ||
+          resp?.data?.["d:Material"] ||
+          '';
+
+        const poMaterialDescription =
+          firstItem.ProductDescription ||
+          firstItem.MaterialDescription ||
+          firstItem.productDescription ||
+          firstItem["d:ProductDescription"] ||
+          firstItem["d:MaterialDescription"] ||
+          resp?.data?.ProductDescription ||
+          resp?.data?.MaterialDescription ||
+          resp?.data?.d?.ProductDescription ||
+          resp?.data?.["d:ProductDescription"] ||
+          resp?.data?.["d:MaterialDescription"] ||
+          '';
+
+        if (!cancelled && (plant || poMaterial || poMaterialDescription)) {
+          setHeader(prev => {
+            if (prev.PurchaseOrderNumber !== poNumber) return prev;
+
+            return {
+              ...prev,
+              Division: plant || prev.Division,
+              Material: poMaterial || prev.Material,
+              MaterialDescription: poMaterialDescription || prev.MaterialDescription,
+            };
+          });
         }
       } catch (err) {
         if (err?.response?.status !== 404) {
@@ -264,6 +426,9 @@ export default function CreateHeader() {
       }
       if (poLookupTimeoutRef.current) {
         clearTimeout(poLookupTimeoutRef.current);
+      }
+      if (duplicateMdpTimeoutRef.current) {
+        clearTimeout(duplicateMdpTimeoutRef.current);
       }
     };
   }, []);
@@ -380,6 +545,33 @@ export default function CreateHeader() {
     setResult(null);
 
     try {
+      if (poApprovalError) {
+        setError(poApprovalError);
+        setLoading(false);
+        return;
+      }
+
+      if (duplicateMdpError) {
+        setError(duplicateMdpError);
+        setLoading(false);
+        return;
+      }
+
+      // Validate Gross Weight
+      const grossWeightStr = String(header.GrossWeight || '').trim();
+      if (grossWeightStr === '') {
+        setError('❌ Gross Weight is required. Please click Get Gross before creating the entry.');
+        setLoading(false);
+        return;
+      }
+
+      const grossWeightNum = Number(grossWeightStr);
+      if (!Number.isFinite(grossWeightNum) || grossWeightNum <= 0) {
+        setError('❌ Gross Weight must be a valid positive number greater than 0. Please check the weighbridge reading.');
+        setLoading(false);
+        return;
+      }
+
       let updatedHeader = { ...header };
 
       const inbound = updatedHeader.InwardTime || `${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')}:${new Date().getSeconds().toString().padStart(2,'0')}`;
@@ -548,12 +740,18 @@ export default function CreateHeader() {
   const resetForm = () => {
     setHeader(createInitialHeaderState());
     setError(null);
+    setDuplicateMdpError(null);
     setResult(null);
   };
 
   const location = useLocation();
   const pathTail = location.pathname.split("/").pop();
   const pageMode = pathTail === "inward" ? "inward" : (pathTail === "outward" ? "outward" : "default");
+  const pageTitle = pageMode === "inward"
+    ? "QR Scanner - Create Gate Entry + Weight (Inward)"
+    : pageMode === "outward"
+      ? "QR Scanner - Create Gate Entry (Outward)"
+      : "QR Scanner - Create Gate Entry + Weight Document";
 
   useEffect(() => {
     if (pageMode === "inward") {
@@ -570,27 +768,34 @@ export default function CreateHeader() {
   // Auto-parse remarks and map fields if remarks is pipe-delimited and not already mapped
   useEffect(() => {
     if (header.Remarks && (header.Remarks.match(/\|/g) || []).length >= 4) {
-      // Avoid infinite loop: only parse if at least one mapped field is empty or different
       const fields = parseQRRemarks(header.Remarks);
-      // Only update if at least one field is not already set
+      const parsedVehicle = String(fields.TruckNumber || '').trim();
+      const currentVehicle = String(header.VehicleNumber || '').trim();
+      const parsedInvoice = String(fields.VendorInvoiceNumber || '').trim();
+      const currentInvoice = String(header.VendorInvoiceNumber || '').trim();
+
+      // Update when parsed value is brand new OR a fuller continuation of current partial value.
+      const shouldUpdateVehicle = Boolean(parsedVehicle) && (
+        !currentVehicle || parsedVehicle === currentVehicle || parsedVehicle.startsWith(currentVehicle)
+      );
+      const shouldUpdateInvoice = Boolean(parsedInvoice) && (
+        !currentInvoice || parsedInvoice === currentInvoice || parsedInvoice.startsWith(currentInvoice)
+      );
+
       if (
-        (!header.VendorInvoiceNumber && fields.VendorInvoiceNumber) ||
-        (!header.VehicleNumber && fields.TruckNumber) ||
-        (!header.Material && fields.material) ||
-        (!header.MaterialDescription && fields.grade)
+        shouldUpdateInvoice ||
+        shouldUpdateVehicle
       ) {
         setHeader(prev => ({
           ...prev,
           PermitNumber: fields.PermitNumber || prev.PermitNumber,
           LRGCNumber: fields.PermitNumber || fields.mteNumber || prev.LRGCNumber,
           VendorInvoiceDate: fields.VendorInvoiceDate || prev.VendorInvoiceDate,
-          VendorInvoiceNumber: fields.VendorInvoiceNumber || prev.VendorInvoiceNumber,
+          VendorInvoiceNumber: shouldUpdateInvoice ? parsedInvoice : prev.VendorInvoiceNumber,
           VendorInvoiceWeight: fields.VendorInvoiceWeight || prev.VendorInvoiceWeight,
           // GrossWeight should be entered manually in inward screen.
           GrossWeight: prev.GrossWeight,
-          VehicleNumber: fields.TruckNumber || prev.VehicleNumber,
-          Material: fields.material || prev.Material,
-          MaterialDescription: fields.grade || prev.MaterialDescription,
+          VehicleNumber: shouldUpdateVehicle ? parsedVehicle : prev.VehicleNumber,
           Division: fields.location || prev.Division,
           // Remarks: prev.Remarks // don't overwrite
         }));
@@ -600,11 +805,169 @@ export default function CreateHeader() {
 
   return (
     <div className="create-header-container">
-      <h2 className="page-title">
-        {pageMode === "inward" ? "Create Gate Entry + Weight (Inward)" : 
-         pageMode === "outward" ? "Create Gate Entry (Outward)" : 
-         "Create Gate Entry + Weight Document"}
-      </h2>
+      {/* ══ ULTRA PREMIUM QR SCANNER BANNER ══ */}
+      <div style={{
+        position: 'relative',
+        borderRadius: '20px',
+        marginBottom: '32px',
+        overflow: 'hidden',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 4px 20px rgba(67,255,142,0.12), inset 0 1px 0 rgba(255,255,255,0.07)',
+      }}>
+        {/* Deep layered background */}
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#020817 0%,#071a3e 25%,#0a2d6e 50%,#0842a0 70%,#0b5ed7 100%)' }} />
+        {/* Aurora sweep — purple + teal + emerald */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 120% at 50% -20%,rgba(139,92,246,0.18) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(6,182,212,0.14) 0%,transparent 55%),radial-gradient(ellipse 50% 70% at 0% 100%,rgba(16,185,129,0.1) 0%,transparent 50%)' }} />
+        {/* Subtle grid mesh */}
+        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(67,255,142,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(67,255,142,0.03) 1px,transparent 1px)', backgroundSize:'32px 32px' }} />
+        {/* Diagonal shimmer streak */}
+        <div style={{ position:'absolute', top:'-40%', left:'-10%', width:'40%', height:'200%', background:'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.035) 50%,transparent 60%)', transform:'skewX(-15deg)', pointerEvents:'none' }} />
+        {/* Ghost QR watermark right side */}
+        <div style={{ position:'absolute', right:'-8px', top:'50%', transform:'translateY(-50%)', opacity:0.045, pointerEvents:'none' }}>
+          <svg viewBox="0 0 80 80" width="108" height="108" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="10" y="10" width="10" height="10" fill="white"/>
+            <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="60" y="10" width="10" height="10" fill="white"/>
+            <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
+            <rect x="10" y="60" width="10" height="10" fill="white"/>
+            <rect x="34" y="3" width="6" height="6" fill="white"/><rect x="42" y="3" width="6" height="6" fill="white"/>
+            <rect x="34" y="34" width="6" height="6" fill="white"/><rect x="50" y="42" width="6" height="6" fill="white"/>
+            <rect x="66" y="50" width="6" height="6" fill="white"/><rect x="66" y="66" width="6" height="6" fill="white"/>
+          </svg>
+        </div>
+        {/* Rainbow prismatic top bar */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:'3px', background:'linear-gradient(90deg,#8b5cf6 0%,#06b6d4 20%,#43ff8e 40%,#facc15 60%,#f97316 80%,#ec4899 100%)', boxShadow:'0 0 18px rgba(67,255,142,0.55),0 0 36px rgba(6,182,212,0.28)' }} />
+        {/* Bottom shimmer bar */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'2px', background:'linear-gradient(90deg,transparent 0%,#8b5cf6 20%,#06b6d4 40%,#43ff8e 60%,#facc15 80%,transparent 100%)', opacity:0.5 }} />
+        {/* Corner brackets — alternating green + cyan */}
+        <div style={{ position:'absolute', top:'10px', left:'10px', width:'22px', height:'22px', borderTop:'2px solid #43ff8e', borderLeft:'2px solid #43ff8e', borderRadius:'4px 0 0 0', boxShadow:'0 0 8px rgba(67,255,142,0.5)', opacity:0.9 }} />
+        <div style={{ position:'absolute', top:'10px', right:'10px', width:'22px', height:'22px', borderTop:'2px solid #06b6d4', borderRight:'2px solid #06b6d4', borderRadius:'0 4px 0 0', boxShadow:'0 0 8px rgba(6,182,212,0.5)', opacity:0.9 }} />
+        <div style={{ position:'absolute', bottom:'10px', left:'10px', width:'22px', height:'22px', borderBottom:'2px solid #06b6d4', borderLeft:'2px solid #06b6d4', borderRadius:'0 0 0 4px', boxShadow:'0 0 8px rgba(6,182,212,0.5)', opacity:0.9 }} />
+        <div style={{ position:'absolute', bottom:'10px', right:'10px', width:'22px', height:'22px', borderBottom:'2px solid #43ff8e', borderRight:'2px solid #43ff8e', borderRadius:'0 0 4px 0', boxShadow:'0 0 8px rgba(67,255,142,0.5)', opacity:0.9 }} />
+
+        {/* ── Main content row ── */}
+        <div style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', gap:'22px', padding:'22px 44px', paddingRight:'clamp(130px, 28vw, 320px)', textAlign:'center' }}>
+          {/* QR icon with glowing ring */}
+            <div style={{ position:'relative', flexShrink:0, width:'72px', height:'72px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <div style={{ position:'absolute', inset:'-4px', borderRadius:'18px', background:'linear-gradient(135deg,#43ff8e,#06b6d4,#8b5cf6,#43ff8e)', opacity:0.45, filter:'blur(6px)' }} />
+              <div style={{ position:'absolute', inset:0, borderRadius:'16px', padding:'2px', background:'linear-gradient(135deg,#43ff8e 0%,#06b6d4 50%,#8b5cf6 100%)' }}>
+                <div style={{ width:'100%', height:'100%', borderRadius:'14px', background:'#040e24' }} />
+              </div>
+              <div style={{ position:'relative', filter:'drop-shadow(0 0 8px rgba(67,255,142,0.8))' }}>
+                <svg viewBox="0 0 80 80" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="qG1" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#43ff8e" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                    <linearGradient id="qG2" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#06b6d4" />
+                      <stop offset="100%" stopColor="#8b5cf6" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qG1)" strokeWidth="4" />
+                  <rect x="10" y="10" width="10" height="10" fill="url(#qG1)" />
+                  <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qG1)" strokeWidth="4" />
+                  <rect x="60" y="10" width="10" height="10" fill="url(#qG1)" />
+                  <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="url(#qG2)" strokeWidth="4" />
+                  <rect x="10" y="60" width="10" height="10" fill="url(#qG2)" />
+                  <rect x="34" y="3" width="6" height="6" fill="#43ff8e" /><rect x="42" y="3" width="6" height="6" fill="#06b6d4" />
+                  <rect x="34" y="11" width="6" height="6" fill="#06b6d4" /><rect x="42" y="11" width="6" height="6" fill="#43ff8e" />
+                  <rect x="34" y="19" width="6" height="6" fill="#8b5cf6" />
+                  <rect x="3" y="34" width="6" height="6" fill="#43ff8e" /><rect x="11" y="34" width="6" height="6" fill="#06b6d4" /><rect x="19" y="34" width="6" height="6" fill="#43ff8e" />
+                  <rect x="34" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="34" width="6" height="6" fill="#43ff8e" />
+                  <rect x="50" y="34" width="6" height="6" fill="#06b6d4" /><rect x="58" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="34" width="6" height="6" fill="#43ff8e" />
+                  <rect x="3" y="42" width="6" height="6" fill="#06b6d4" /><rect x="19" y="42" width="6" height="6" fill="#8b5cf6" />
+                  <rect x="34" y="42" width="6" height="6" fill="#43ff8e" /><rect x="50" y="42" width="6" height="6" fill="#06b6d4" /><rect x="66" y="42" width="6" height="6" fill="#43ff8e" />
+                  <rect x="34" y="50" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="50" width="6" height="6" fill="#06b6d4" /><rect x="58" y="50" width="6" height="6" fill="#43ff8e" />
+                  <rect x="34" y="58" width="6" height="6" fill="#06b6d4" /><rect x="50" y="58" width="6" height="6" fill="#8b5cf6" />
+                  <rect x="34" y="66" width="6" height="6" fill="#43ff8e" /><rect x="42" y="66" width="6" height="6" fill="#06b6d4" />
+                  <rect x="58" y="66" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="58" width="6" height="6" fill="#06b6d4" /><rect x="66" y="66" width="6" height="6" fill="#43ff8e" />
+                </svg>
+              </div>
+            </div>
+
+            <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
+              <div style={{
+                display:'inline-flex', alignItems:'center', gap:'6px',
+                background: pageMode === 'inward'
+                  ? 'linear-gradient(90deg, rgba(67,255,142,0.18), rgba(6,182,212,0.12))'
+                  : pageMode === 'outward'
+                    ? 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(139,92,246,0.12))'
+                    : 'linear-gradient(90deg, rgba(250,204,21,0.18), rgba(249,115,22,0.12))',
+                border: `1px solid ${pageMode === 'inward' ? 'rgba(67,255,142,0.5)' : pageMode === 'outward' ? 'rgba(6,182,212,0.5)' : 'rgba(250,204,21,0.5)'}`,
+                borderRadius:'30px', padding:'3px 14px', marginBottom:'8px',
+                fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase',
+                color: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
+                boxShadow: pageMode === 'inward' ? '0 0 12px rgba(67,255,142,0.2)' : pageMode === 'outward' ? '0 0 12px rgba(6,182,212,0.2)' : '0 0 12px rgba(250,204,21,0.2)',
+              }}>
+                <span style={{
+                  width:'5px', height:'5px', borderRadius:'50%', flexShrink:0,
+                  background: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
+                  boxShadow: `0 0 6px ${pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15'}`,
+                }} />
+                {pageMode === 'inward' ? '⬇ Inward' : pageMode === 'outward' ? '⬆ Outward' : '⟳ Default'}
+              </div>
+              <h2 style={{
+                margin:0, fontSize:'1.7rem', fontWeight:800,
+                fontFamily:"'Playfair Display', 'Cormorant Garamond', Georgia, serif",
+                fontStyle:'italic', letterSpacing:'0.01em', lineHeight:1.15,
+                background:'linear-gradient(90deg, #ffffff 0%, #c7f4ff 30%, #43ff8e 60%, #06b6d4 100%)',
+                WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+                filter:'drop-shadow(0 2px 12px rgba(67,255,142,0.25))',
+              }}>
+                {pageMode === 'inward'
+                  ? 'QR Scanner — Gate Entry + Weight'
+                  : pageMode === 'outward'
+                    ? 'QR Scanner — Gate Entry'
+                    : 'QR Scanner — Gate Entry + Weight Document'}
+              </h2>
+              <div style={{ width:'65%', height:'1px', margin:'8px auto', background:'linear-gradient(90deg, transparent, rgba(67,255,142,0.45), rgba(6,182,212,0.45), rgba(139,92,246,0.3), transparent)' }} />
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap' }}>
+                <span style={{ color:'#94d8f8', fontWeight:500, fontSize:'0.83rem', fontFamily:"'Playfair Display', Georgia, serif", letterSpacing:'0.03em', display:'flex', alignItems:'center', gap:'5px' }}>
+                  <span>📡</span>
+                  Scan QR slip to auto-fill vehicle &amp; invoice details
+                </span>
+                {/* <span style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(6,182,212,0.2))', border:'1px solid rgba(139,92,246,0.45)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#c4b5fd', fontWeight:700, letterSpacing:'0.05em', boxShadow:'0 0 8px rgba(139,92,246,0.15)' }}>
+                  🏗 Gate 2
+                </span> */}
+                <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', background:'rgba(67,255,142,0.1)', border:'1px solid rgba(67,255,142,0.3)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#43ff8e', fontWeight:700, letterSpacing:'0.06em' }}>
+                  <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#43ff8e', boxShadow:'0 0 6px #43ff8e, 0 0 10px rgba(67,255,142,0.6)', display:'inline-block' }} />
+                  LIVE
+                </span>
+              </div>
+          </div>
+        </div>
+
+        <div style={{
+          position: 'absolute',
+          top: '0',
+          right: '0',
+          bottom: '0',
+          width: 'clamp(120px, 22vw, 240px)',
+          pointerEvents: 'none',
+          opacity: 0.94,
+          display: 'flex',
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
+          
+          overflow: 'hidden',
+        }}>
+          <img
+            src="/ChatGPT%20Image%20Mar%2026,%202026,%2004_04_01%20PM.png"
+            alt="Scanner"
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit: 'cover',
+              objectPosition: 'right center',
+              maskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
+              WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
+            }}
+          />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.type !== 'submit') {
@@ -613,14 +976,14 @@ export default function CreateHeader() {
       }}>
         <section className="form-section">
           <h3 className="section-title">Header Information</h3>
-          <div className="grid-3-cols">
+          <div className="grid-7-cols">
             <div className="form-group">
-              <label className="form-label">Gate Entry Number (Auto) *</label>
+              <label className="form-label">Gate Entry Number</label>
               <input className="form-input" name="GateEntryNumber" value={header.GateEntryNumber} readOnly style={{ background: '#f0f0f0' }} />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Weight Doc Number (Auto)</label>
+              <label className="form-label">Weight Doc Number</label>
               <input className="form-input" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ background: '#f0f0f0' }} />
             </div>
 
@@ -632,22 +995,6 @@ export default function CreateHeader() {
             <div className="form-group">
               <label className="form-label">Vehicle Number *</label>
               <input className="form-input" name="VehicleNumber" value={header.VehicleNumber} onChange={handleChange} required />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Gross Weight (MT)</label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input className="form-input" name="GrossWeight" value={header.GrossWeight} onChange={handleChange} placeholder="0" />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleGetGrossWeight}
-                  disabled={grossWeightLoading || loading}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  {grossWeightLoading ? 'Getting...' : 'Get Gross'}
-                </button>
-              </div>
             </div>
 
             <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
@@ -786,6 +1133,11 @@ export default function CreateHeader() {
             <div className="form-group full-width">
               <label className="form-label">Remarks</label>
               <textarea className="form-textarea" name="Remarks" value={header.Remarks} onChange={handleChange} rows={2} />
+              {duplicateMdpError && (
+                <div className="error-message" style={{ marginTop: '8px' }}>
+                  <strong>Error:</strong> {duplicateMdpError}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -794,10 +1146,15 @@ export default function CreateHeader() {
           <h3 className="section-title">Purchase Order Details</h3>
           <div className="po-entry-card">
             <h4 className="po-entry-title">PO Entry</h4>
-            <div className="grid-4-cols">
+            <div className="grid-7-cols">
               <div className="form-group">
                 <label className="form-label">PO Number</label>
                 <input className="form-input" name="PurchaseOrderNumber" value={header.PurchaseOrderNumber} onChange={handleChange} />
+                {poApprovalError && (
+                  <div className="error-message" style={{ marginTop: '8px' }}>
+                    <strong>Error:</strong> {poApprovalError}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Material</label>
@@ -836,10 +1193,32 @@ export default function CreateHeader() {
         </section>
 
         <div className="form-actions">
+          <div className="form-group" style={{ minWidth: '280px', marginBottom: 0 }}>
+            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Gross Weight *</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                className="form-input"
+                name="GrossWeight"
+                value={header.GrossWeight}
+                readOnly
+                placeholder="0"
+                style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleGetGrossWeight}
+                disabled={grossWeightLoading || loading}
+                style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
+              >
+                {grossWeightLoading ? 'Getting...' : 'Get Gross'}
+              </button>
+            </div>
+          </div>
           <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`}>
-            {loading ? "Creating..." : "✅ Create Gate Entry + Weight Document"}
+            {loading ? "Creating..." : "✅ Create Gate Entry"}
           </button>
-          <button type="button" onClick={resetForm} className="btn btn-secondary">Reset Form</button>
+          {/* <button type="button" onClick={resetForm} className="btn btn-secondary">Reset Form</button> */}
         </div>
       </form>
 
