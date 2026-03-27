@@ -217,6 +217,12 @@ export function initialRegistration(payload) {
   return api.post('/initial-registration', payload); 
 }
 
+
+export function fetchsodetails(search) {
+  return api.get(`/sodetails?search=${encodeURIComponent(search)}`);
+}
+
+
 ///api/transporterdetails/:transporter
 export function transporterDetails(search) { 
   return api.get(`/transporterdetails?search=${encodeURIComponent(search)}`); 

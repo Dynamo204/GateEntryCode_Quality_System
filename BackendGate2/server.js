@@ -52,6 +52,8 @@ const SAP_BASE_BILLING_PDF = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odat
 const SAP_BASE_PRODUCT = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
 const SAP_BASE_CustomerMaster = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
 const SAP_BASE_SupplierMaster = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
+const SAP_BASE_SO2 = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
+const SAP_BASE_MAILIDADDRESSES = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
 const SAP_USER_ST = 'BTPINTEGRATION';
 const SAP_PASS_ST = 'BTPIntegration@1234567890';
 
@@ -172,6 +174,22 @@ const sapAxiosCustomerMaster = axios.create({
 
 const sapAxiosSupplierMaster = axios.create({
   baseURL: SAP_BASE_SupplierMaster,
+  auth: {
+    username: SAP_USER_ST,
+    password: SAP_PASS_ST
+  }
+});
+
+const sapAxiosSOdetails = axios.create({
+  baseURL: SAP_BASE_SO2,
+  auth: {
+    username: SAP_USER_ST,
+    password: SAP_PASS_ST
+  }
+});
+
+const sapAxiosMailIDAddresses = axios.create({
+  baseURL: SAP_BASE_MAILIDADDRESSES,
   auth: {
     username: SAP_USER_ST,
     password: SAP_PASS_ST
@@ -2567,119 +2585,272 @@ app.patch('/api/initial-registration/:uuid', async (req, res) => {
 });
 
 // Email configuration (add before app.listen)
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // or 'outlook', 'yahoo', etc.
-  auth: {
-    user: 'chinnasukumar056@gmail.com', // Replace with your Gmail
-    pass: 'fjzb fxne zvoe xnae'      // Replace with Gmail App Password (not regular password)
+// const transporter = nodemailer.createTransport({
+//   service: 'gmail', // or 'outlook', 'yahoo', etc.
+//   auth: {
+//     user: 'chinnasukumar056@gmail.com', // Replace with your Gmail
+//     pass: 'fjzb fxne zvoe xnae'      // Replace with Gmail App Password (not regular password)
+//   }
+// });
+
+// // Email notification endpoint
+// app.post('/api/send-notification', async (req, res) => {
+//   try {
+//     const { gateEntryNumber, weightDocNumber, vehicleNumber, grossWeight, date } = req.body;
+
+//     const mailOptions = {
+//       from: 'chinnasukumar056@gmail.com',
+//       to: 'n.sukumar056@gmail.com',
+//       subject: `✅ Gate Entry Created - ${gateEntryNumber}`,
+//       html: `
+//         <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
+//           <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+//             <h2 style="color: #4CAF50; margin-bottom: 20px;">✅ New Gate Entry Created</h2>
+            
+//             <table style="width: 100%; border-collapse: collapse;">
+//               <tr style="border-bottom: 1px solid #eee;">
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Gate Entry Number:</td>
+//                 <td style="padding: 12px 0; color: #333;">${gateEntryNumber}</td>
+//               </tr>
+//               <tr style="border-bottom: 1px solid #eee;">
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Weight Document Number:</td>
+//                 <td style="padding: 12px 0; color: #333;">${weightDocNumber || 'N/A'}</td>
+//               </tr>
+//               <tr style="border-bottom: 1px solid #eee;">
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Vehicle Number:</td>
+//                 <td style="padding: 12px 0; color: #333;">${vehicleNumber}</td>
+//               </tr>
+//               <tr style="border-bottom: 1px solid #eee;">
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Gross Weight:</td>
+//                 <td style="padding: 12px 0; color: #333;">${grossWeight ? grossWeight + ' MT' : 'N/A'}</td>
+//               </tr>
+//               <tr style="border-bottom: 1px solid #eee;">
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Date:</td>
+//                 <td style="padding: 12px 0; color: #333;">${date}</td>
+//               </tr>
+//               <tr>
+//                 <td style="padding: 12px 0; font-weight: bold; color: #555;">Created At:</td>
+//                 <td style="padding: 12px 0; color: #333;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+//               </tr>
+//             </table>
+            
+//             <div style="margin-top: 30px; padding: 15px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 5px;">
+//               <p style="margin: 0; color: #2e7d32;">
+//                 <strong>Status:</strong> Gate Entry and Weight Document created successfully in SAP system.
+//               </p>
+//             </div>
+//           </div>
+//         </div>
+//       `
+//     };
+
+//     await transporter.sendMail(mailOptions);
+//     console.log('✅ Email notification sent successfully');
+//     res.json({ success: true, message: 'Email sent successfully' });
+//   } catch (error) {
+//     console.error('❌ Email send error:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// app.post('/api/initial/send-notification', async (req, res) => {
+//   try {
+//     const { registrationNumber, weightDocNumber, vehicleNumber, transporterNumber, grossWeight, date, transporterEmail } = req.body;
+
+//     const mailOptions = {
+//       from: 'chinnasukumar056@gmail.com',
+//       to: transporterEmail || 'n.sukumar056@gmail.com', // fallback if not provided
+//   subject: `✅ Registration Created - ${registrationNumber}`,
+// html: `
+//   <p>Dear Sir / Madam,</p>
+
+//   <p>
+//     As per your request, the truck has been successfully registered for loading.
+//   </p>
+
+//   <table border="1" cellpadding="6" cellspacing="0">
+//     <tr>
+//       <th align="left">Registration</th>
+//       <td>${registrationNumber}</td>
+//     </tr>
+//     <tr>
+//       <th align="left">Transporter</th>
+//       <td>${transporterNumber}</td>
+//     </tr>
+//     <tr>
+//       <th align="left">Vehicle Number</th>
+//       <td>${vehicleNumber}</td>
+//     </tr>
+//   </table>
+
+//   <br/>
+
+//   <p>
+//     Regards,<br/>
+//     <strong>Gate Entry Team</strong>
+//   </p>
+// `
+//     };
+
+//     await transporter.sendMail(mailOptions);
+//     res.json({ success: true, message: 'Email sent successfully' });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+
+async function getMailConfigFromSAP() {
+  const resp = await sapAxiosMailIDAddresses.get(
+      `/YY1_MAILIDADDRESSES?$filter=Technicaltype eq 'BTP_INVOICE_PDF'&$format=json`
+  );
+ 
+  const data = resp.data?.d?.results?.[0];
+ 
+  if (!data) throw new Error("No mail config found in SAP");
+ 
+  return {
+    user: data.MailUser,
+    pass: data.MailPassword,
+    host: data.Host,
+    port: Number(data.Port) || 587
+  };
+}
+async function getSapTransporter() {
+  const mailConfig = await getMailConfigFromSAP();
+ 
+  console.log("MAIL CONFIG:", mailConfig); // debug
+ 
+  return {
+    transporter: nodemailer.createTransport({
+      host: mailConfig.host,
+      port: mailConfig.port,
+      secure: false, // for 587
+      auth: {
+        user: mailConfig.user,
+        pass: mailConfig.pass
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    }),
+    mailConfig
+  };
+}
+
+ 
+ 
+app.post("/api/send-notification", async (req, res) => {
+  try {
+    console.log("API HIT");
+ 
+    const { transporter, mailConfig } = await getSapTransporter();
+ 
+    const { gateEntryNumber, weightDocNumber, vehicleNumber, grossWeight, date } = req.body;
+ 
+    const mailOptions = {
+      from: mailConfig.user, // MUST match SMTP user
+      to: "n.sukumar056@gmail.com",
+      subject: `Gate Entry Created - ${gateEntryNumber}`,
+      html: `
+        <h2>Gate Entry Created</h2>
+        <p><b>Gate Entry:</b> ${gateEntryNumber}</p>
+        <p><b>Vehicle:</b> ${vehicleNumber}</p>
+        <p><b>Weight:</b> ${grossWeight || "N/A"}</p>
+        <p><b>Date:</b> ${date}</p>
+      `
+    };
+ 
+    await transporter.sendMail(mailOptions);
+ 
+    console.log("MAIL SENT SUCCESS");
+    res.json({ success: true });
+ 
+  } catch (error) {
+    console.error("FULL ERROR:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// Email notification endpoint
-app.post('/api/send-notification', async (req, res) => {
+ 
+ 
+app.post("/api/initial/send-notification", async (req, res) => {
   try {
-    const { gateEntryNumber, weightDocNumber, vehicleNumber, grossWeight, date } = req.body;
-
+    console.log("API HIT INITIAL");
+ 
+    const { transporter, mailConfig } = await getSapTransporter();
+ 
+    const {
+      registrationNumber,
+      weightDocNumber,
+      vehicleNumber,
+      transporterNumber,
+      grossWeight,
+      date,
+      transporterEmail
+    } = req.body;
+ 
     const mailOptions = {
-      from: 'chinnasukumar056@gmail.com',
-      to: 'n.sukumar056@gmail.com',
-      subject: `✅ Gate Entry Created - ${gateEntryNumber}`,
+      from: mailConfig.user,
+      to: transporterEmail || "n.sukumar056@gmail.com",
+      subject: `✅ Registration Created - ${registrationNumber}`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
-          <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #4CAF50; margin-bottom: 20px;">✅ New Gate Entry Created</h2>
-            
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Gate Entry Number:</td>
-                <td style="padding: 12px 0; color: #333;">${gateEntryNumber}</td>
+         
+          <div style="background: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+           
+            <p>Dear Sir / Madam,</p>
+ 
+            <p>
+              As per your request, the truck has been successfully registered for loading.
+            </p>
+ 
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+             
+              <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; font-weight: bold;">Registration</td>
+                <td style="padding: 10px;">${registrationNumber}</td>
               </tr>
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Weight Document Number:</td>
-                <td style="padding: 12px 0; color: #333;">${weightDocNumber || 'N/A'}</td>
+ 
+              <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; font-weight: bold;">Transporter</td>
+                <td style="padding: 10px;">${transporterNumber}</td>
               </tr>
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Vehicle Number:</td>
-                <td style="padding: 12px 0; color: #333;">${vehicleNumber}</td>
+ 
+              <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; font-weight: bold;">Vehicle Number</td>
+                <td style="padding: 10px;">${vehicleNumber}</td>
               </tr>
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Gross Weight:</td>
-                <td style="padding: 12px 0; color: #333;">${grossWeight ? grossWeight + ' MT' : 'N/A'}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Date:</td>
-                <td style="padding: 12px 0; color: #333;">${date}</td>
-              </tr>
+ 
               <tr>
-                <td style="padding: 12px 0; font-weight: bold; color: #555;">Created At:</td>
-                <td style="padding: 12px 0; color: #333;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                <td style="padding: 10px; font-weight: bold;">Date</td>
+                <td style="padding: 10px;">${date || "N/A"}</td>
               </tr>
+ 
             </table>
-            
-            <div style="margin-top: 30px; padding: 15px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 5px;">
-              <p style="margin: 0; color: #2e7d32;">
-                <strong>Status:</strong> Gate Entry and Weight Document created successfully in SAP system.
+ 
+            <div style="margin-top: 20px;">
+              <p>
+                Regards,<br/>
+                <strong>Gate Entry Team</strong>
               </p>
             </div>
+ 
           </div>
         </div>
       `
     };
-
+ 
     await transporter.sendMail(mailOptions);
-    console.log('✅ Email notification sent successfully');
-    res.json({ success: true, message: 'Email sent successfully' });
+ 
+    console.log("MAIL SENT SUCCESS");
+    res.json({ success: true, message: "Email sent successfully" });
+ 
   } catch (error) {
-    console.error('❌ Email send error:', error);
+    console.error("FULL ERROR:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-app.post('/api/initial/send-notification', async (req, res) => {
-  try {
-    const { registrationNumber, weightDocNumber, vehicleNumber, transporterNumber, grossWeight, date, transporterEmail } = req.body;
-
-    const mailOptions = {
-      from: 'chinnasukumar056@gmail.com',
-      to: transporterEmail || 'n.sukumar056@gmail.com', // fallback if not provided
-  subject: `✅ Registration Created - ${registrationNumber}`,
-html: `
-  <p>Dear Sir / Madam,</p>
-
-  <p>
-    As per your request, the truck has been successfully registered for loading.
-  </p>
-
-  <table border="1" cellpadding="6" cellspacing="0">
-    <tr>
-      <th align="left">Registration</th>
-      <td>${registrationNumber}</td>
-    </tr>
-    <tr>
-      <th align="left">Transporter</th>
-      <td>${transporterNumber}</td>
-    </tr>
-    <tr>
-      <th align="left">Vehicle Number</th>
-      <td>${vehicleNumber}</td>
-    </tr>
-  </table>
-
-  <br/>
-
-  <p>
-    Regards,<br/>
-    <strong>Gate Entry Team</strong>
-  </p>
-`
-    };
-
-    await transporter.sendMail(mailOptions);
-    res.json({ success: true, message: 'Email sent successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+ 
 
 /**
  * Parse SAP error into user-friendly message
@@ -3092,6 +3263,57 @@ async function fetchCsrfTokenOutboundDelivery() {
     throw err;
   }
 }
+
+app.get('/api/sodetails', async (req, res) => {
+  const search = (req.query.search || '').trim();
+  if (!search) {
+    return res.status(400).json({ error: 'Missing search parameter' });
+  }
+ 
+  try {
+    // 1. Fetch SO headers matching the search (partial match, top 25)
+    const filter = `substringof('${search}',SalesDocument)`;
+    const headerPath = `/YY1_RFID_SO?$filter=${filter}&$top=25&$format=json`;
+    const headerResp = await sapAxiosSOdetails.get(headerPath);
+    const headers = headerResp.data?.d?.results || [];
+    if (headers.length === 0) return res.json([]);
+ 
+    // 2. Collect all SO numbers
+    const soNumbers = headers.map(h => h.SalesDocument);
+    if (soNumbers.length === 0) return res.json([]);
+ 
+    // 3. Fetch all line items for these SOs in one call
+    const itemFilter = soNumbers.map(so => `SalesDocument eq '${so}'`).join(' or ');
+    const itemPath = `/YY1_RFID_SO?$filter=${encodeURIComponent(itemFilter)}&$format=json`;
+    const itemResp = await sapAxiosSOdetails.get(itemPath);
+    const items = itemResp.data?.d?.results || [];
+ 
+    // 4. Group items by SO number
+    const itemsBySO = {};
+    items.forEach(item => {
+      if (!itemsBySO[item.SalesDocument]) itemsBySO[item.SalesDocument] = [];
+      itemsBySO[item.SalesDocument].push(item);
+    });
+ 
+    // 5. Build response: for each SO, include header fields and line items
+    const result = headers.map(h => ({
+      SalesDocument: h.SalesDocument,
+      Customer: h.Customer,
+      CustomerName: h.CustomerName,
+      items: (itemsBySO[h.SalesDocument] || []).map(li => ({
+        Material: li.Product,
+        MaterialDescription: li.ProductDescription,
+        BalanceQty: li.OpenReqdDelivQtyInOrdQtyUnit,
+        BalanceQtyUnit: li.OrderQuantity
+      }))
+    }));
+ 
+    res.json(result);
+  } catch (err) {
+    console.error('SO details error', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch SO details' });
+  }
+});
 
 // POST Outbound Delivery
 // app.post('/api/outbounddelivery', async (req, res) => {
@@ -3545,13 +3767,420 @@ app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (re
 });
 
 
-app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
+// app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
+//   try {
+//     const deliveryDocument = req.body.DeliveryDocument;
+//     if (!deliveryDocument) {
+//       return res.status(400).json({ error: "DeliveryDocument parameter is required" });
+//     }
+
+//     // 1. Post Goods Issue
+//     const { token, cookies } = await fetchCsrfTokenGoodsIssue();
+//     const url = `/PostGoodsIssue?DeliveryDocument='${encodeURIComponent(deliveryDocument)}'`;
+//     const goodsIssueResp = await sapAxiosOBD.post(url, {}, {
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'x-csrf-token': token,
+//         'If-Match': '*',
+//         Cookie: cookies
+//       }
+//     });
+
+//     // 2. If successful, create billing document
+//     if (goodsIssueResp.status === 201 || goodsIssueResp.status === 200) {
+//       const billingPayload = {
+//         "_Control": {
+//           "DefaultBillingDocumentType": "F2",
+//           "AutomPostingToAcctgIsDisabled": false,
+//         },
+//         "_Reference": [
+//           {
+//             "SDDocument": deliveryDocument,
+//             "SDDocumentCategory": "J"
+//           }
+//         ]
+//       };
+//       const billingUrl = `/BillingDocument/SAP__self.CreateFromSDDocument?DeliveryDocument='${encodeURIComponent(deliveryDocument)}'`;
+//       const billingResp = await sapAxiosBilling.post(billingUrl, billingPayload, {
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'x-csrf-token': token,
+//           'If-Match': '*',
+//           Cookie: cookies
+//         }
+//       });
+
+//       console.log('Billing response status:', billingResp.status, 'data:', billingResp.data); 
+//       // Extract billing document number from value array if present
+//       let billingDocumentNumber = undefined;
+//       if (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0) {
+//         billingDocumentNumber = billingResp.data.value[0].BillingDocument;
+//       } else if (billingResp.data?.BillingDocument) {
+//         billingDocumentNumber = billingResp.data.BillingDocument;
+//       }
+//       console.log('Billing Document Number from response:', billingDocumentNumber);
+
+//       // Respond with both numbers
+//       return res.json({
+//         success: true,
+//         goodsIssueNumber: deliveryDocument,
+//         billingDocumentNumber
+//       });
+// if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
+//         const billingDocNumber = billingResp.data?.BillingDocument || 
+//     (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0 ? 
+//       billingResp.data.value[0].BillingDocument : undefined);
+  
+//   console.log('Billing Document Number:', billingDocNumber);
+  
+//   if (!billingDocNumber) {
+//     console.error('Billing document number is missing in response:', billingResp.data);
+//     return res.status(500).json({
+//       error: 'Billing document number is missing in SAP response',
+//       details: billingResp.data
+//     });
+//   }
+  
+//   console.log(`✅ Billing document ${billingDocNumber} created`);
+
+//   // Wait for SAP to process the document
+//   await new Promise(resolve => setTimeout(resolve, 3000));
+
+//   // Download PDF (SAP returns XML with base64 PDF)
+//   try {
+//     const { XMLParser } = require("fast-xml-parser");
+//     function findBillingBinary(obj) {
+//       if (obj == null) return null;
+//       if (typeof obj === "string") {
+//         if (obj.trim().startsWith("JVBER")) return obj;
+//         return null;
+//       }
+//       if (typeof obj !== "object") return null;
+//       for (const key of Object.keys(obj)) {
+//         const val = obj[key];
+//         const shortKey = key.includes(":") ? key.split(":").pop() : key;
+//         if (shortKey === "BillingDocumentBinary") {
+//           if (typeof val === "string") return val;
+//           if (val && typeof val === "object") {
+//             if ("#text" in val) return val["#text"];
+//             if ("text" in val) return val["text"];
+//             const s = JSON.stringify(val);
+//             if (s && s.includes("JVBER")) {
+//               const m = s.match(/JVBER[^\"]*/);
+//               if (m) return m[0];
+//             }
+//           }
+//         }
+//         const found = findBillingBinary(val);
+//         if (found) return found;
+//       }
+//       return null;
+//     }
+
+//     const pdfUrl = `/GetPDF?BillingDocument='${billingDocNumber}'`;
+//     const pdfResponse = await sapAxiosBillingPDF.get(pdfUrl, {
+//       headers: {
+//         'x-csrf-token': token,
+//         'Cookie': cookies,
+//         'Accept': 'application/xml, text/xml, */*'
+//       },
+//       responseType: 'text',
+//       timeout: 30000
+//     });
+
+//     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+//     const parsed = parser.parse(pdfResponse.data);
+//     const base64 = findBillingBinary(parsed);
+//     if (!base64) {
+//       console.error("BillingDocumentBinary not found in SAP response. Raw SAP response:\n", pdfResponse.data.substring(0, 1000));
+//       throw new Error("BillingDocumentBinary not found in SAP response");
+//     }
+//     const b64clean = base64.toString().replace(/\s+/g, "");
+//     const pdfBuffer = Buffer.from(b64clean, "base64");
+
+//     // Set response headers for PDF download
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename="Billing_${billingDocNumber}.pdf"`);
+//     res.setHeader('X-Goods-Issue-Number', deliveryDocument || '');
+//     res.setHeader('X-Billing-Document-Number', billingDocNumber);
+//     res.setHeader('Access-Control-Expose-Headers', 'X-Goods-Issue-Number, X-Billing-Document-Number');
+// console.log('Base64 PDF (first 500 chars):', b64clean.substring(0, 500));
+// console.log('PDF buffer length:', pdfBuffer.length);
+// if (!pdfBuffer || pdfBuffer.length < 1000) {
+//   console.error('PDF buffer is too small, likely invalid.');
+// }
+//     // Send PDF buffer directly
+//     res.send(pdfBuffer);
+//     // Send PDF as email attachment
+// try {
+//   await transporter.sendMail({
+//     from: 'chinnasukumar056@gmail.com',
+//     to: 'n.sukumar056@gmail.com', // or dynamic recipient
+//     subject: `Billing Document PDF - ${billingDocNumber}`,
+//     text: `Please find attached the billing document PDF for Delivery Document: ${deliveryDocument}`,
+//     attachments: [
+//       {
+//         filename: `Billing_${billingDocNumber}.pdf`,
+//         content: pdfBuffer,
+//         contentType: 'application/pdf'
+//       }
+//     ]
+//   });
+//   console.log('✅ Billing PDF emailed successfully');
+// } catch (mailErr) {
+//   console.error('❌ Failed to send billing PDF email:', mailErr);
+// }
+    
+//     console.log(`📄 PDF for ${billingDocNumber} downloaded automatically`);
+    
+//   } catch (pdfError) {
+//     console.error(`PDF download failed for ${billingDocNumber}:`, pdfError.message);
+//     // Fallback: Return JSON response
+//     if (!res.headersSent) {
+//       return res.status(201).json({
+//         success: true,
+//         billingDocument: billingDocNumber,
+//         message: 'Billing created but PDF download failed',
+//         error: pdfError.message || 'PDF download failed',
+//         goodsIssueNumber: deliveryDocument
+//       });
+//     }
+//   }
+// } 
+// else {
+//         return res.status(billingResp.status).json({ error: 'Billing creation failed', details: billingResp.data });
+//       }
+//     } else {
+//       return res.status(goodsIssueResp.status).json({ error: 'Goods issue failed', details: goodsIssueResp.data });
+//     }
+//   } catch (err) {
+//     // Only log serializable error info
+//     const status = err?.response?.status;
+//     const data = err?.response?.data;
+//     const message = err?.message;
+//     console.error('Goods Issue + Invoice error', status, message, data);
+// res.status(status || 500).json({
+//   error: message
+// });
+//   }
+// });
+
+
+
+ 
+// app.post("/api/goodsissue-and-invoice", async (req, res) => {
+//   try {
+ 
+//     const {
+//       GateEntryNumber,
+//       WeighmentUpdate,
+//       OutboundDeliveryUpdate,
+//       GoodsIssue
+//     } = req.body;
+//      if (GateEntryNumber === null || GateEntryNumber === undefined || GateEntryNumber === '') {
+//       return res.status(400).json({ error: 'GateEntryNumber is required in the request body Weighment2' });
+//     }
+//     if (OutboundDeliveryUpdate.DeliveryDocument === null || OutboundDeliveryUpdate.DeliveryDocument === undefined || OutboundDeliveryUpdate.DeliveryDocument === '') {
+//       return res.status(400).json({ error: 'DeliveryDocument is required in the request body' });
+//     }
+//     if (WeighmentUpdate.NetWeight === null || WeighmentUpdate.NetWeight === undefined || WeighmentUpdate.NetWeight.length === 0) {
+//       return res.status(400).json({ error: 'NetWeight is required in the request body' });  }
+//     if (WeighmentUpdate.GrossWeight === null || WeighmentUpdate.GrossWeight === undefined || WeighmentUpdate.GrossWeight.length === 0) {
+//       return res.status(400).json({ error: 'GrossWeight is required in the request body' });  }
+//    // if (Number(WeighmentUpdate.NetWeight) < 100) {
+//    //  return res.status(400).json({error: "NetWeight should be greater than 99",
+//    //   DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument    });   }
+ 
+//     if (Number(WeighmentUpdate?.NetWeight) < 100) {
+ 
+//      const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
+ 
+//      const deletePath = `/A_OutbDeliveryHeader('${OutboundDeliveryUpdate.DeliveryDocument}')`;
+ 
+//       await sapAxiosOBD.delete(deletePath, {
+//       headers: {
+//        "x-csrf-token": token,
+//        "If-Match": "*",
+//        Cookie: cookies
+//       }
+//       });
+ 
+//       return res.status(400).json({
+//        message: "NetWeight below 100. Outbound Delivery Deleted",
+//        DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument
+//        });
+//       }
+ 
+//     let result = {
+//       weighment: null,
+//       outboundDelivery: null,
+//       goodsIssue: null,
+//       billing: null
+//     };
+ 
+//     // Always fetch weighment data if GateEntryNumber is present
+//     let getResp = null;
+//     let uuid = null;
+//     if (GateEntryNumber) {
+//       getResp = await sapAxiosWeight.get(
+//         `/YY1_CAPTURINGWEIGHTDETAILS?$filter=GateEntryNumber eq '${GateEntryNumber}'&$format=json`
+//       );
+//       uuid = getResp.data?.d?.results?.[0]?.SAP_UUID;
+//     }
+//       console.log(getResp?.data?.d?.results?.[0], "getResp data");
+ 
+//     /* ==========================
+//        1️⃣ UPDATE WEIGHMENT
+//     ========================== */
+//     if (GateEntryNumber && WeighmentUpdate) {
+//       if (!uuid) return res.status(404).json({ error: "Weighment not found" });
+//       const { token, cookies } = await fetchCsrfTokenWeight();
+//       await sapAxiosWeight.patch(
+//         `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`,
+//         WeighmentUpdate,
+//         {
+//           headers: {
+//             "Content-Type": "application/json",
+//             "x-csrf-token": token,
+//             "If-Match": "*",
+//             Cookie: cookies
+//           }
+//         }
+//       );
+//       result.weighment = "Updated";
+//     }
+ 
+//     /* ==========================
+//        2️⃣ UPDATE OUTBOUND DELIVERY ITEMS
+//     ========================== */
+//     function formatSapODataDate(date) {
+//   if (!date) return null;
+//   if (typeof date === 'string' && date.startsWith('/Date(')) return date;
+//   const d = new Date(date);
+//   if (isNaN(d.getTime())) return null;
+//   return `/Date(${d.getTime()})/`;
+// }
+//     if (OutboundDeliveryUpdate?.DeliveryDocument && OutboundDeliveryUpdate?.Items?.length) {
+//             for (const item of OutboundDeliveryUpdate.Items) {
+//             const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
+//             // PATCH Outbound Delivery Header with custom fields
+//             const headerPath = `/A_OutbDeliveryHeader(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}')`;
+//             const headerPayload = {
+//               YY1_WeighbridgeDate_DLH: formatSapODataDate(getResp?.data?.d?.results?.[0]?.GateOutDate),
+//               YY1_WeighbridgeTime_DLH: getResp?.data?.d?.results?.[0]?.OutwardTime,
+//               YY1_WeighbridgeNo_DLH: String(getResp?.data?.d?.results?.[0]?.WeightDocNumber || '').trim(),
+//               YY1_GrossWeight_DLH: item.GrossWeight,
+//               // Add other custom header fields as needed
+//             };
+//             await sapAxiosOBD.patch(headerPath, headerPayload, {
+//               headers: {
+//                 "Content-Type": "application/json",
+//                 "x-csrf-token": token,
+//                 "If-Match": "*",
+//                 Cookie: cookies
+//               }
+//             });
+ 
+//         const path = `/A_OutbDeliveryItem(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}',DeliveryDocumentItem='${10}')`;
+//         const payload = {
+//           ActualDeliveryQuantity: item.NetWeight,
+//         };
+ 
+//         await sapAxiosOBD.patch(path, payload, {
+//           headers: {
+//             "Content-Type": "application/json",
+//             "x-csrf-token": token,
+//             "If-Match": "*",
+//             Cookie: cookies
+//           }
+//         });
+//       }
+//       result.outboundDelivery = "Items Updated";
+//     }
+ 
+   
+ 
+//     /* ==========================
+//        3️⃣ POST GOODS ISSUE
+//     ========================== */
+//     if (GoodsIssue?.DeliveryDocument) {
+ 
+//       const { token, cookies } = await fetchCsrfTokenGoodsIssue();
+ 
+//       const giResp = await sapAxiosOBD.post(
+//         `/PostGoodsIssue?DeliveryDocument='${encodeURIComponent(GoodsIssue.DeliveryDocument)}'`,
+//         {},
+//         {
+//           headers: {
+//             "x-csrf-token": token,
+//             "If-Match": "*",
+//             Cookie: cookies
+//           }
+//         }
+//       );
+ 
+//       if (giResp.status !== 200 && giResp.status !== 201) {
+//         return res.status(400).json({ error: "Goods Issue Failed" });
+//       }
+ 
+//       result.goodsIssue = "Posted";
+ 
+//       /* ==========================
+//          4️⃣ CREATE BILLING
+//       ========================== */
+ 
+//       const billingPayload = {
+//         "_Control": {
+//           "DefaultBillingDocumentType": "F2",
+//           "AutomPostingToAcctgIsDisabled": false
+//         },
+//         "_Reference": [
+//           {
+//             "SDDocument": GoodsIssue.DeliveryDocument,
+//             "SDDocumentCategory": "J"
+//           }
+//         ]
+//       };
+ 
+//       const billingResp = await sapAxiosBilling.post(
+//         `/BillingDocument/SAP__self.CreateFromSDDocument?DeliveryDocument='${encodeURIComponent(GoodsIssue.DeliveryDocument)}'`,
+//         billingPayload,
+//         {
+//           headers: {
+//             "x-csrf-token": token,
+//             "If-Match": "*",
+//             Cookie: cookies
+//           }
+//         }
+//       );
+ 
+//       result.billing =
+//         billingResp.data?.value?.[0]?.BillingDocument ||
+//         billingResp.data?.BillingDocument;
+//     }
+ 
+//     return res.json({
+//       success: true,
+//       result
+//     });
+ 
+//   } catch (err) {
+//     console.error("Combined Flow Error:", err?.response?.data || err.message);
+//     return res.status(500).json({
+//       error: err?.response?.data?.error?.message?.value
+//   || err.message
+//     });
+//   }
+// });
+ 
+ 
+ app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
   try {
     const deliveryDocument = req.body.DeliveryDocument;
     if (!deliveryDocument) {
       return res.status(400).json({ error: "DeliveryDocument parameter is required" });
     }
-
+ 
     // 1. Post Goods Issue
     const { token, cookies } = await fetchCsrfTokenGoodsIssue();
     const url = `/PostGoodsIssue?DeliveryDocument='${encodeURIComponent(deliveryDocument)}'`;
@@ -3563,7 +4192,7 @@ app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
         Cookie: cookies
       }
     });
-
+ 
     // 2. If successful, create billing document
     if (goodsIssueResp.status === 201 || goodsIssueResp.status === 200) {
       const billingPayload = {
@@ -3587,8 +4216,8 @@ app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
           Cookie: cookies
         }
       });
-
-      console.log('Billing response status:', billingResp.status, 'data:', billingResp.data); 
+ 
+      console.log('Billing response status:', billingResp.status, 'data:', billingResp.data);
       // Extract billing document number from value array if present
       let billingDocumentNumber = undefined;
       if (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0) {
@@ -3597,35 +4226,175 @@ app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
         billingDocumentNumber = billingResp.data.BillingDocument;
       }
       console.log('Billing Document Number from response:', billingDocumentNumber);
-
-      // Respond with both numbers
-      return res.json({
-        success: true,
-        goodsIssueNumber: deliveryDocument,
-        billingDocumentNumber
-      });
-if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
-        const billingDocNumber = billingResp.data?.BillingDocument || 
-    (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0 ? 
-      billingResp.data.value[0].BillingDocument : undefined);
-  
-  console.log('Billing Document Number:', billingDocNumber);
-  
-  if (!billingDocNumber) {
-    console.error('Billing document number is missing in response:', billingResp.data);
-    return res.status(500).json({
-      error: 'Billing document number is missing in SAP response',
-      details: billingResp.data
-    });
+ 
+      // Only continue if billing creation was successful
+      if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
+        const billingDocNumber = billingDocumentNumber;
+        console.log('Billing Document Number:', billingDocNumber);
+        if (!billingDocNumber) {
+          console.error('Billing document number is missing in response:', billingResp.data);
+          return res.status(500).json({
+            error: 'Billing document number is missing in SAP response',
+            details: billingResp.data
+          });
+        }
+        console.log(`✅ Billing document ${billingDocNumber} created`);
+        // Wait for SAP to process the document
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Download PDF (SAP returns XML with base64 PDF)
+        try {
+          const { XMLParser } = require("fast-xml-parser");
+          function findBillingBinary(obj) {
+            if (obj == null) return null;
+            if (typeof obj === "string") {
+              if (obj.trim().startsWith("JVBER")) return obj;
+              return null;
+            }
+            if (typeof obj !== "object") return null;
+            for (const key of Object.keys(obj)) {
+              const val = obj[key];
+              const shortKey = key.includes(":") ? key.split(":").pop() : key;
+              if (shortKey === "BillingDocumentBinary") {
+                if (typeof val === "string") return val;
+                if (val && typeof val === "object") {
+                  if ("#text" in val) return val["#text"];
+                  if ("text" in val) return val["text"];
+                  const s = JSON.stringify(val);
+                  if (s && s.includes("JVBER")) {
+                    const m = s.match(/JVBER[^\"]*/);
+                    if (m) return m[0];
+                  }
+                }
+              }
+              const found = findBillingBinary(val);
+              if (found) return found;
+            }
+            return null;
+          }
+          const pdfUrl = `/GetPDF?BillingDocument='${billingDocNumber}'`;
+          const pdfResponse = await sapAxiosBillingPDF.get(pdfUrl, {
+            headers: {
+              'x-csrf-token': token,
+              'Cookie': cookies,
+              'Accept': 'application/xml, text/xml, */*'
+            },
+            responseType: 'text',
+            timeout: 30000
+          });
+          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+          const parsed = parser.parse(pdfResponse.data);
+          const base64 = findBillingBinary(parsed);
+          if (!base64) {
+            console.error("BillingDocumentBinary not found in SAP response. Raw SAP response:\n", pdfResponse.data.substring(0, 1000));
+            throw new Error("BillingDocumentBinary not found in SAP response");
+          }
+          const b64clean = base64.toString().replace(/\s+/g, "");
+          const pdfBuffer = Buffer.from(b64clean, "base64");
+          // Set response headers for PDF download
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="Billing_${billingDocNumber}.pdf"`);
+          res.setHeader('X-Goods-Issue-Number', deliveryDocument || '');
+          res.setHeader('X-Billing-Document-Number', billingDocNumber);
+          res.setHeader('Access-Control-Expose-Headers', 'X-Goods-Issue-Number, X-Billing-Document-Number');
+          console.log('Base64 PDF (first 500 chars):', b64clean.substring(0, 500));
+          console.log('PDF buffer length:', pdfBuffer.length);
+          if (!pdfBuffer || pdfBuffer.length < 1000) {
+            console.error('PDF buffer is too small, likely invalid.');
+          }
+          // Send PDF buffer directly
+          res.send(pdfBuffer);
+          // Send PDF as email attachment (non-blocking for client)
+          try {
+const customerEmail =
+  billingResp.data?.value?.[0]?.YY1_SoldtoParty_Email_BDH ||
+  billingResp.data?.value?.[0]?.YY1_ShiptoParty_Email_BDH;
+ 
+ 
+const mailConfig = await getMailConfigFromSAP();
+const transporter = nodemailer.createTransport({
+  host: mailConfig.host,
+  port: mailConfig.port,
+  secure: false,
+  auth: {
+    user: mailConfig.user,
+    pass: mailConfig.pass
+  },
+  tls: {
+    rejectUnauthorized: false
   }
-  
-  console.log(`✅ Billing document ${billingDocNumber} created`);
-
-  // Wait for SAP to process the document
-  await new Promise(resolve => setTimeout(resolve, 3000));
-
-  // Download PDF (SAP returns XML with base64 PDF)
+});
+ 
+ 
+await transporter.sendMail({
+  from: mailConfig.user, // your client mail
+  to: customerEmail, // dynamic customer email
+  subject: `Billing Document PDF - ${billingDocNumber}`,
+  text: `Please find attached the billing document PDF for Delivery Document: ${deliveryDocument}`,
+  attachments: [
+    {
+      filename: `Billing_${billingDocNumber}.pdf`,
+      content: pdfBuffer,
+      contentType: 'application/pdf'
+    }
+  ]
+});
+            console.log('✅ Billing PDF emailed successfully');
+          } catch (mailErr) {
+            console.error('❌ Failed to send billing PDF email:', mailErr);
+          }      
+    try {
+       // Call your own printer API
+    const printResp = await axios.post(
+     "http://localhost:4600/api/printer/print",
+     {
+    pdfBase64: pdfBuffer.toString("base64"),
+    fileName: `Billing_${billingDocNumber}.pdf`
+     }
+     );
+       console.log("✅ Billing PDF sent to printer:", printResp.data);
+     } catch (printErr) {
+     console.error("❌ Failed to print billing PDF:", printErr?.message);
+     }
+          console.log(`📄 PDF for ${billingDocNumber} downloaded automatically`);
+          return;
+        } catch (pdfError) {
+          console.error(`PDF download failed for ${billingDocNumber}:`, pdfError.message);
+          // Fallback: Return JSON response
+          if (!res.headersSent) {
+            return res.status(201).json({
+              success: true,
+              billingDocument: billingDocNumber,
+              message: 'Billing created but PDF download failed',
+              error: pdfError.message || 'PDF download failed',
+              goodsIssueNumber: deliveryDocument
+            });
+          }
+        }
+      } else {
+        return res.status(billingResp.status).json({ error: 'Billing creation failed', details: billingResp.data });
+      }
+    } else {
+      return res.status(goodsIssueResp.status).json({ error: 'Goods issue failed', details: goodsIssueResp.data });
+    }
+  } catch (err) {
+    // Only log serializable error info
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+    const message = err?.message;
+    console.error('Goods Issue + Invoice error', status, message, data);
+res.status(status || 500).json({
+  error: message
+});
+  }
+});
+ 
+app.get('/api/billing-pdf/:billingDocumentNumber', async (req, res) => {
   try {
+    const billingDocNumber = req.params.billingDocumentNumber;
+    if (!billingDocNumber) {
+      return res.status(400).json({ error: "BillingDocumentNumber is required" });
+    }
+    const { token, cookies } = await fetchCsrfTokenGoodsIssue();
     const { XMLParser } = require("fast-xml-parser");
     function findBillingBinary(obj) {
       if (obj == null) return null;
@@ -3654,7 +4423,7 @@ if (billingResp.status === 201 || billingResp.status === 200 || billingResp.stat
       }
       return null;
     }
-
+ 
     const pdfUrl = `/GetPDF?BillingDocument='${billingDocNumber}'`;
     const pdfResponse = await sapAxiosBillingPDF.get(pdfUrl, {
       headers: {
@@ -3665,86 +4434,27 @@ if (billingResp.status === 201 || billingResp.status === 200 || billingResp.stat
       responseType: 'text',
       timeout: 30000
     });
-
+ 
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
     const parsed = parser.parse(pdfResponse.data);
     const base64 = findBillingBinary(parsed);
     if (!base64) {
-      console.error("BillingDocumentBinary not found in SAP response. Raw SAP response:\n", pdfResponse.data.substring(0, 1000));
-      throw new Error("BillingDocumentBinary not found in SAP response");
+      return res.status(404).json({ error: "BillingDocumentBinary not found in SAP response" });
     }
     const b64clean = base64.toString().replace(/\s+/g, "");
     const pdfBuffer = Buffer.from(b64clean, "base64");
-
-    // Set response headers for PDF download
+ 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Billing_${billingDocNumber}.pdf"`);
-    res.setHeader('X-Goods-Issue-Number', deliveryDocument || '');
-    res.setHeader('X-Billing-Document-Number', billingDocNumber);
-    res.setHeader('Access-Control-Expose-Headers', 'X-Goods-Issue-Number, X-Billing-Document-Number');
-console.log('Base64 PDF (first 500 chars):', b64clean.substring(0, 500));
-console.log('PDF buffer length:', pdfBuffer.length);
-if (!pdfBuffer || pdfBuffer.length < 1000) {
-  console.error('PDF buffer is too small, likely invalid.');
-}
-    // Send PDF buffer directly
     res.send(pdfBuffer);
-    // Send PDF as email attachment
-try {
-  await transporter.sendMail({
-    from: 'chinnasukumar056@gmail.com',
-    to: 'n.sukumar056@gmail.com', // or dynamic recipient
-    subject: `Billing Document PDF - ${billingDocNumber}`,
-    text: `Please find attached the billing document PDF for Delivery Document: ${deliveryDocument}`,
-    attachments: [
-      {
-        filename: `Billing_${billingDocNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }
-    ]
-  });
-  console.log('✅ Billing PDF emailed successfully');
-} catch (mailErr) {
-  console.error('❌ Failed to send billing PDF email:', mailErr);
-}
-    
-    console.log(`📄 PDF for ${billingDocNumber} downloaded automatically`);
-    
-  } catch (pdfError) {
-    console.error(`PDF download failed for ${billingDocNumber}:`, pdfError.message);
-    // Fallback: Return JSON response
-    if (!res.headersSent) {
-      return res.status(201).json({
-        success: true,
-        billingDocument: billingDocNumber,
-        message: 'Billing created but PDF download failed',
-        error: pdfError.message || 'PDF download failed',
-        goodsIssueNumber: deliveryDocument
-      });
-    }
-  }
-} 
-else {
-        return res.status(billingResp.status).json({ error: 'Billing creation failed', details: billingResp.data });
-      }
-    } else {
-      return res.status(goodsIssueResp.status).json({ error: 'Goods issue failed', details: goodsIssueResp.data });
-    }
   } catch (err) {
-    // Only log serializable error info
-    const status = err?.response?.status;
-    const data = err?.response?.data;
-    const message = err?.message;
-    console.error('Goods Issue + Invoice error', status, message, data);
-res.status(status || 500).json({
-  error: message
-});
+    console.error('Billing PDF download error:', err?.message);
+    res.status(500).json({ error: err?.message || 'Failed to download billing PDF' });
   }
 });
-
-
-
+ 
+ 
+ 
  
 app.post("/api/goodsissue-and-invoice", async (req, res) => {
   try {
@@ -3845,7 +4555,7 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
             const headerPath = `/A_OutbDeliveryHeader(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}')`;
             const headerPayload = {
               YY1_WeighbridgeDate_DLH: formatSapODataDate(getResp?.data?.d?.results?.[0]?.GateOutDate),
-              YY1_WeighbridgeTime_DLH: getResp?.data?.d?.results?.[0]?.OutwardTime,
+              YY1_WeighbridgeTime_DLH: formatSapTime(getResp?.data?.d?.results?.[0]?.OutwardTime),
               YY1_WeighbridgeNo_DLH: String(getResp?.data?.d?.results?.[0]?.WeightDocNumber || '').trim(),
               YY1_GrossWeight_DLH: item.GrossWeight,
               // Add other custom header fields as needed
@@ -3935,8 +4645,136 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
       result.billing =
         billingResp.data?.value?.[0]?.BillingDocument ||
         billingResp.data?.BillingDocument;
-    }
+   
  
+    console.log('RFID Billing document details:', billingResp?.data);
+          // Only continue if billing creation was successful
+      if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
+        const billingDocNumber = result.billing;
+        console.log('Billing Document Number:', billingDocNumber);
+        if (!billingDocNumber) {
+          console.error('Billing document number is missing in response:', billingResp.data);
+          return res.status(500).json({
+            error: 'Billing document number is missing in SAP response',
+            details: billingResp.data
+          });
+        }
+        console.log(`✅ Billing document ${billingDocNumber} created`);
+        // Respond immediately with billing document number
+        res.status(201).json({
+          success: true,
+          billingDocument: billingDocNumber,
+          message: 'Billing created',
+          goodsIssueNumber: GoodsIssue.DeliveryDocument
+        });
+        // In background, download PDF and send email
+        (async () => {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const { XMLParser } = require("fast-xml-parser");
+            function findBillingBinary(obj) {
+              if (obj == null) return null;
+              if (typeof obj === "string") {
+                if (obj.trim().startsWith("JVBER")) return obj;
+                return null;
+              }
+              if (typeof obj !== "object") return null;
+              for (const key of Object.keys(obj)) {
+                const val = obj[key];
+                const shortKey = key.includes(":") ? key.split(":").pop() : key;
+                if (shortKey === "BillingDocumentBinary") {
+                  if (typeof val === "string") return val;
+                  if (val && typeof val === "object") {
+                    if ("#text" in val) return val["#text"];
+                    if ("text" in val) return val["text"];
+                    const s = JSON.stringify(val);
+                    if (s && s.includes("JVBER")) {
+                      const m = s.match(/JVBER[^"]*/);
+                      if (m) return m[0];
+                    }
+                  }
+                }
+                const found = findBillingBinary(val);
+                if (found) return found;
+              }
+              return null;
+            }
+            const pdfUrl = `/GetPDF?BillingDocument='${billingDocNumber}'`;
+            const pdfResponse = await sapAxiosBillingPDF.get(pdfUrl, {
+              headers: {
+                'x-csrf-token': token,
+                'Cookie': cookies,
+                'Accept': 'application/xml, text/xml, */*'
+              },
+              responseType: 'text',
+              timeout: 30000
+            });
+            const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+            const parsed = parser.parse(pdfResponse.data);
+            const base64 = findBillingBinary(parsed);
+            if (!base64) {
+              console.error("BillingDocumentBinary not found in SAP response. Raw SAP response:\n", pdfResponse.data.substring(0, 1000));
+              throw new Error("BillingDocumentBinary not found in SAP response");
+            }
+            const b64clean = base64.toString().replace(/\s+/g, "");
+            const pdfBuffer = Buffer.from(b64clean, "base64");
+            // Send PDF as email attachment
+            try {
+              const customerEmail =
+                billingResp.data?.value?.[0]?.YY1_SoldtoParty_Email_BDH ||
+                billingResp.data?.value?.[0]?.YY1_ShiptoParty_Email_BDH;
+              const mailConfig = await getMailConfigFromSAP();
+              const transporter = nodemailer.createTransport({
+                host: mailConfig.host,
+                port: mailConfig.port,
+                secure: false,
+                auth: {
+                  user: mailConfig.user,
+                  pass: mailConfig.pass
+                },
+                tls: {
+                  rejectUnauthorized: false
+                }
+              });
+              await transporter.sendMail({
+                from: mailConfig.user,
+                to: customerEmail,
+                subject: `Billing Document PDF - ${billingDocNumber}`,
+                text: `Please find attached the billing document PDF for Billing Document: ${billingDocNumber}`,
+                attachments: [
+                  {
+                    filename: `Billing_${billingDocNumber}.pdf`,
+                    content: pdfBuffer,
+                    contentType: 'application/pdf'
+                  }
+                ]
+              });
+              console.log('✅ Billing PDF emailed successfully');
+            } catch (mailErr) {
+              console.error('❌ Failed to send billing PDF email:', mailErr);
+            }
+            console.log(`📄 PDF for ${billingDocNumber} processed in background`);
+// Additionally, send PDF to printer API
+       try {
+       // Call your own printer API
+    const printResp = await axios.post(
+     "http://localhost:4600/api/printer/print",
+     {
+    pdfBase64: pdfBuffer.toString("base64"),
+    fileName: `Billing_${billingDocNumber}.pdf`
+     }
+     );
+       console.log("✅ Billing PDF sent to printer:", printResp.data);
+     } catch (printErr) {
+     console.error("❌ Failed to print billing PDF:", printErr?.message);
+     }
+          } catch (pdfError) {
+            console.error(`PDF download/email failed for ${billingDocNumber}:`, pdfError.message);
+          }
+        })();
+        return;
+      }
+    }
     return res.json({
       success: true,
       result
@@ -3950,9 +4788,6 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
     });
   }
 });
- 
- 
- 
  
 
 // // GET /api/material-trucks?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD
