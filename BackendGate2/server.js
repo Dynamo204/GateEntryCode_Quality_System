@@ -3455,6 +3455,15 @@ app.post('/api/materialoutward-full', async (req, res) => {
     if (gateEntries.length === 0) {
       return res.status(404).json({ success: false, error: 'No gate entry found with the provided GateEntryNumber' });
     }
+
+    if (gateEntries.Status === 'Cancelled') {
+      return res.status(400).json({ success: false, error: 'The gate entry has been cancelled and cannot be processed.' });
+    }
+
+    if (gateEntries.GateEntryNumber === weightDocument.GateEntryNumber ){
+      return res.status(400).json({ success: false, error: 'The gate entry number already exists in the system. Please check and provide a unique gate entry number.' });
+    }
+
   if (weightDocument.GateEntryNumber === null || weightDocument.GateEntryNumber === undefined || weightDocument.GateEntryNumber === '')
       {
       return res.status(400).json({ success: false, error: 'Gate entry number is missing for the gate entry.' });
@@ -3477,15 +3486,33 @@ app.post('/api/materialoutward-full', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Remarks is missing for the gate entry.' });
     }
  
+function formatSapODataDate(date) {
+  if (!date) return null;
 
+  // If already SAP format → return as is
+  if (typeof date === "string" && date.startsWith("/Date(")) {
+    return date;
+  }
 
-    function formatSapODataDate(date) {
-      if (!date) return null;
-      if (typeof date === 'string' && date.startsWith('/Date(')) return date;
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return null;
-      return `/Date(${d.getTime()})/`;
-    }
+  const d = new Date(date);
+
+  if (isNaN(d.getTime())) return null;
+
+  return `/Date(${d.getTime()})/`;
+}
+
+function formatSapTime(timeStr) {
+  if (!timeStr) return null;
+
+  // If already SAP format → return as is
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+
+  // If normal format → convert
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
     const entry = gateEntries[0];
     console.log('Fetched gate entry from SAP:', entry);
     console.log('Weighment 1 data :', weightDocument);
@@ -3498,10 +3525,10 @@ app.post('/api/materialoutward-full', async (req, res) => {
       YY1_TransporterName_DLH: entry.Transporter,
       YY1_TruckNumber_DLH: entry.TruckNumber,
       YY1_GateEntryDate_DLH: formatSapODataDate(entry.GateEntryDate),
-      YY1_GateEntryTime_DLH: entry.OutwardTime,
+      YY1_GateEntryTime_DLH: formatSapTime(entry.InwardTime),
      // YY1_TareWeight_DLH: entry.TareWeight,
       YY1_WeighbridgeDate_DLH: formatSapODataDate(entry.GateOutDate),
-      YY1_WeighbridgeTime_DLH: entry.OutwardTime,
+      YY1_WeighbridgeTime_DLH: formatSapTime(entry.OutwardTime),
       YY1_TareWeight_DLH: weightDocument.TareWeight,
       to_DeliveryDocumentItem: {
         results: [
@@ -3648,45 +3675,6 @@ async function fetchCsrfTokenGoodsIssue() {
 
 
 
-
-
-
-
-//
-// PATCH Outbound Delivery Item
-// app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (req, res) => {
-//   const deliveryDocument = req.params.deliveryDocument;
-//   const itemNumber = req.params.itemNumber;
-//   const { ActualDeliveryQuantity, ActualDeliveryQtyUnit } = req.body;
-//   if (!ActualDeliveryQuantity) {
-//     return res.status(400).json({ error: "ActualDeliveryQuantity is required" });
-//   }
-//   try {
-//     const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
-//     // PATCH to the item entity
-//     const path = `/A_OutbDeliveryItem(DeliveryDocument='${deliveryDocument}',DeliveryDocumentItem='${itemNumber}')`;
-//     const payload = {
-//       ActualDeliveryQuantity: ActualDeliveryQuantity
-//     };
-//     if (ActualDeliveryQtyUnit) payload.ActualDeliveryQtyUnit = ActualDeliveryQtyUnit;
-//     const resp = await sapAxiosOBD.patch(path, payload, {
-//       headers: {
-//         'Content-Type': 'application/json', 
-//         'x-csrf-token': token,
-//         'If-Match': '*',
-//         Cookie: cookies
-//       },
-//       validateStatus: status => status < 500
-//     });
-//     if (resp.status === 204) return res.status(204).send();
-//     res.status(resp.status).json(resp.data);
-//   } catch (err) {
-//     console.error('Outbound Delivery Item PATCH error', err?.response?.status, err?.response?.data || err.message);
-//     res.status(err?.response?.status || 500).json({ error: err?.response?.data || err?.message || 'Failed to update outbound delivery item' });
-//   }
-// });
-
-
 app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (req, res) => {
  
   const deliveryDocument = req.params.deliveryDocument;
@@ -3766,413 +3754,6 @@ app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (re
   }
 });
 
-
-// app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
-//   try {
-//     const deliveryDocument = req.body.DeliveryDocument;
-//     if (!deliveryDocument) {
-//       return res.status(400).json({ error: "DeliveryDocument parameter is required" });
-//     }
-
-//     // 1. Post Goods Issue
-//     const { token, cookies } = await fetchCsrfTokenGoodsIssue();
-//     const url = `/PostGoodsIssue?DeliveryDocument='${encodeURIComponent(deliveryDocument)}'`;
-//     const goodsIssueResp = await sapAxiosOBD.post(url, {}, {
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'x-csrf-token': token,
-//         'If-Match': '*',
-//         Cookie: cookies
-//       }
-//     });
-
-//     // 2. If successful, create billing document
-//     if (goodsIssueResp.status === 201 || goodsIssueResp.status === 200) {
-//       const billingPayload = {
-//         "_Control": {
-//           "DefaultBillingDocumentType": "F2",
-//           "AutomPostingToAcctgIsDisabled": false,
-//         },
-//         "_Reference": [
-//           {
-//             "SDDocument": deliveryDocument,
-//             "SDDocumentCategory": "J"
-//           }
-//         ]
-//       };
-//       const billingUrl = `/BillingDocument/SAP__self.CreateFromSDDocument?DeliveryDocument='${encodeURIComponent(deliveryDocument)}'`;
-//       const billingResp = await sapAxiosBilling.post(billingUrl, billingPayload, {
-//         headers: {
-//           'Content-Type': 'application/json',
-//           'x-csrf-token': token,
-//           'If-Match': '*',
-//           Cookie: cookies
-//         }
-//       });
-
-//       console.log('Billing response status:', billingResp.status, 'data:', billingResp.data); 
-//       // Extract billing document number from value array if present
-//       let billingDocumentNumber = undefined;
-//       if (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0) {
-//         billingDocumentNumber = billingResp.data.value[0].BillingDocument;
-//       } else if (billingResp.data?.BillingDocument) {
-//         billingDocumentNumber = billingResp.data.BillingDocument;
-//       }
-//       console.log('Billing Document Number from response:', billingDocumentNumber);
-
-//       // Respond with both numbers
-//       return res.json({
-//         success: true,
-//         goodsIssueNumber: deliveryDocument,
-//         billingDocumentNumber
-//       });
-// if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
-//         const billingDocNumber = billingResp.data?.BillingDocument || 
-//     (Array.isArray(billingResp.data?.value) && billingResp.data.value.length > 0 ? 
-//       billingResp.data.value[0].BillingDocument : undefined);
-  
-//   console.log('Billing Document Number:', billingDocNumber);
-  
-//   if (!billingDocNumber) {
-//     console.error('Billing document number is missing in response:', billingResp.data);
-//     return res.status(500).json({
-//       error: 'Billing document number is missing in SAP response',
-//       details: billingResp.data
-//     });
-//   }
-  
-//   console.log(`✅ Billing document ${billingDocNumber} created`);
-
-//   // Wait for SAP to process the document
-//   await new Promise(resolve => setTimeout(resolve, 3000));
-
-//   // Download PDF (SAP returns XML with base64 PDF)
-//   try {
-//     const { XMLParser } = require("fast-xml-parser");
-//     function findBillingBinary(obj) {
-//       if (obj == null) return null;
-//       if (typeof obj === "string") {
-//         if (obj.trim().startsWith("JVBER")) return obj;
-//         return null;
-//       }
-//       if (typeof obj !== "object") return null;
-//       for (const key of Object.keys(obj)) {
-//         const val = obj[key];
-//         const shortKey = key.includes(":") ? key.split(":").pop() : key;
-//         if (shortKey === "BillingDocumentBinary") {
-//           if (typeof val === "string") return val;
-//           if (val && typeof val === "object") {
-//             if ("#text" in val) return val["#text"];
-//             if ("text" in val) return val["text"];
-//             const s = JSON.stringify(val);
-//             if (s && s.includes("JVBER")) {
-//               const m = s.match(/JVBER[^\"]*/);
-//               if (m) return m[0];
-//             }
-//           }
-//         }
-//         const found = findBillingBinary(val);
-//         if (found) return found;
-//       }
-//       return null;
-//     }
-
-//     const pdfUrl = `/GetPDF?BillingDocument='${billingDocNumber}'`;
-//     const pdfResponse = await sapAxiosBillingPDF.get(pdfUrl, {
-//       headers: {
-//         'x-csrf-token': token,
-//         'Cookie': cookies,
-//         'Accept': 'application/xml, text/xml, */*'
-//       },
-//       responseType: 'text',
-//       timeout: 30000
-//     });
-
-//     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
-//     const parsed = parser.parse(pdfResponse.data);
-//     const base64 = findBillingBinary(parsed);
-//     if (!base64) {
-//       console.error("BillingDocumentBinary not found in SAP response. Raw SAP response:\n", pdfResponse.data.substring(0, 1000));
-//       throw new Error("BillingDocumentBinary not found in SAP response");
-//     }
-//     const b64clean = base64.toString().replace(/\s+/g, "");
-//     const pdfBuffer = Buffer.from(b64clean, "base64");
-
-//     // Set response headers for PDF download
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', `attachment; filename="Billing_${billingDocNumber}.pdf"`);
-//     res.setHeader('X-Goods-Issue-Number', deliveryDocument || '');
-//     res.setHeader('X-Billing-Document-Number', billingDocNumber);
-//     res.setHeader('Access-Control-Expose-Headers', 'X-Goods-Issue-Number, X-Billing-Document-Number');
-// console.log('Base64 PDF (first 500 chars):', b64clean.substring(0, 500));
-// console.log('PDF buffer length:', pdfBuffer.length);
-// if (!pdfBuffer || pdfBuffer.length < 1000) {
-//   console.error('PDF buffer is too small, likely invalid.');
-// }
-//     // Send PDF buffer directly
-//     res.send(pdfBuffer);
-//     // Send PDF as email attachment
-// try {
-//   await transporter.sendMail({
-//     from: 'chinnasukumar056@gmail.com',
-//     to: 'n.sukumar056@gmail.com', // or dynamic recipient
-//     subject: `Billing Document PDF - ${billingDocNumber}`,
-//     text: `Please find attached the billing document PDF for Delivery Document: ${deliveryDocument}`,
-//     attachments: [
-//       {
-//         filename: `Billing_${billingDocNumber}.pdf`,
-//         content: pdfBuffer,
-//         contentType: 'application/pdf'
-//       }
-//     ]
-//   });
-//   console.log('✅ Billing PDF emailed successfully');
-// } catch (mailErr) {
-//   console.error('❌ Failed to send billing PDF email:', mailErr);
-// }
-    
-//     console.log(`📄 PDF for ${billingDocNumber} downloaded automatically`);
-    
-//   } catch (pdfError) {
-//     console.error(`PDF download failed for ${billingDocNumber}:`, pdfError.message);
-//     // Fallback: Return JSON response
-//     if (!res.headersSent) {
-//       return res.status(201).json({
-//         success: true,
-//         billingDocument: billingDocNumber,
-//         message: 'Billing created but PDF download failed',
-//         error: pdfError.message || 'PDF download failed',
-//         goodsIssueNumber: deliveryDocument
-//       });
-//     }
-//   }
-// } 
-// else {
-//         return res.status(billingResp.status).json({ error: 'Billing creation failed', details: billingResp.data });
-//       }
-//     } else {
-//       return res.status(goodsIssueResp.status).json({ error: 'Goods issue failed', details: goodsIssueResp.data });
-//     }
-//   } catch (err) {
-//     // Only log serializable error info
-//     const status = err?.response?.status;
-//     const data = err?.response?.data;
-//     const message = err?.message;
-//     console.error('Goods Issue + Invoice error', status, message, data);
-// res.status(status || 500).json({
-//   error: message
-// });
-//   }
-// });
-
-
-
- 
-// app.post("/api/goodsissue-and-invoice", async (req, res) => {
-//   try {
- 
-//     const {
-//       GateEntryNumber,
-//       WeighmentUpdate,
-//       OutboundDeliveryUpdate,
-//       GoodsIssue
-//     } = req.body;
-//      if (GateEntryNumber === null || GateEntryNumber === undefined || GateEntryNumber === '') {
-//       return res.status(400).json({ error: 'GateEntryNumber is required in the request body Weighment2' });
-//     }
-//     if (OutboundDeliveryUpdate.DeliveryDocument === null || OutboundDeliveryUpdate.DeliveryDocument === undefined || OutboundDeliveryUpdate.DeliveryDocument === '') {
-//       return res.status(400).json({ error: 'DeliveryDocument is required in the request body' });
-//     }
-//     if (WeighmentUpdate.NetWeight === null || WeighmentUpdate.NetWeight === undefined || WeighmentUpdate.NetWeight.length === 0) {
-//       return res.status(400).json({ error: 'NetWeight is required in the request body' });  }
-//     if (WeighmentUpdate.GrossWeight === null || WeighmentUpdate.GrossWeight === undefined || WeighmentUpdate.GrossWeight.length === 0) {
-//       return res.status(400).json({ error: 'GrossWeight is required in the request body' });  }
-//    // if (Number(WeighmentUpdate.NetWeight) < 100) {
-//    //  return res.status(400).json({error: "NetWeight should be greater than 99",
-//    //   DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument    });   }
- 
-//     if (Number(WeighmentUpdate?.NetWeight) < 100) {
- 
-//      const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
- 
-//      const deletePath = `/A_OutbDeliveryHeader('${OutboundDeliveryUpdate.DeliveryDocument}')`;
- 
-//       await sapAxiosOBD.delete(deletePath, {
-//       headers: {
-//        "x-csrf-token": token,
-//        "If-Match": "*",
-//        Cookie: cookies
-//       }
-//       });
- 
-//       return res.status(400).json({
-//        message: "NetWeight below 100. Outbound Delivery Deleted",
-//        DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument
-//        });
-//       }
- 
-//     let result = {
-//       weighment: null,
-//       outboundDelivery: null,
-//       goodsIssue: null,
-//       billing: null
-//     };
- 
-//     // Always fetch weighment data if GateEntryNumber is present
-//     let getResp = null;
-//     let uuid = null;
-//     if (GateEntryNumber) {
-//       getResp = await sapAxiosWeight.get(
-//         `/YY1_CAPTURINGWEIGHTDETAILS?$filter=GateEntryNumber eq '${GateEntryNumber}'&$format=json`
-//       );
-//       uuid = getResp.data?.d?.results?.[0]?.SAP_UUID;
-//     }
-//       console.log(getResp?.data?.d?.results?.[0], "getResp data");
- 
-//     /* ==========================
-//        1️⃣ UPDATE WEIGHMENT
-//     ========================== */
-//     if (GateEntryNumber && WeighmentUpdate) {
-//       if (!uuid) return res.status(404).json({ error: "Weighment not found" });
-//       const { token, cookies } = await fetchCsrfTokenWeight();
-//       await sapAxiosWeight.patch(
-//         `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`,
-//         WeighmentUpdate,
-//         {
-//           headers: {
-//             "Content-Type": "application/json",
-//             "x-csrf-token": token,
-//             "If-Match": "*",
-//             Cookie: cookies
-//           }
-//         }
-//       );
-//       result.weighment = "Updated";
-//     }
- 
-//     /* ==========================
-//        2️⃣ UPDATE OUTBOUND DELIVERY ITEMS
-//     ========================== */
-//     function formatSapODataDate(date) {
-//   if (!date) return null;
-//   if (typeof date === 'string' && date.startsWith('/Date(')) return date;
-//   const d = new Date(date);
-//   if (isNaN(d.getTime())) return null;
-//   return `/Date(${d.getTime()})/`;
-// }
-//     if (OutboundDeliveryUpdate?.DeliveryDocument && OutboundDeliveryUpdate?.Items?.length) {
-//             for (const item of OutboundDeliveryUpdate.Items) {
-//             const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
-//             // PATCH Outbound Delivery Header with custom fields
-//             const headerPath = `/A_OutbDeliveryHeader(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}')`;
-//             const headerPayload = {
-//               YY1_WeighbridgeDate_DLH: formatSapODataDate(getResp?.data?.d?.results?.[0]?.GateOutDate),
-//               YY1_WeighbridgeTime_DLH: getResp?.data?.d?.results?.[0]?.OutwardTime,
-//               YY1_WeighbridgeNo_DLH: String(getResp?.data?.d?.results?.[0]?.WeightDocNumber || '').trim(),
-//               YY1_GrossWeight_DLH: item.GrossWeight,
-//               // Add other custom header fields as needed
-//             };
-//             await sapAxiosOBD.patch(headerPath, headerPayload, {
-//               headers: {
-//                 "Content-Type": "application/json",
-//                 "x-csrf-token": token,
-//                 "If-Match": "*",
-//                 Cookie: cookies
-//               }
-//             });
- 
-//         const path = `/A_OutbDeliveryItem(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}',DeliveryDocumentItem='${10}')`;
-//         const payload = {
-//           ActualDeliveryQuantity: item.NetWeight,
-//         };
- 
-//         await sapAxiosOBD.patch(path, payload, {
-//           headers: {
-//             "Content-Type": "application/json",
-//             "x-csrf-token": token,
-//             "If-Match": "*",
-//             Cookie: cookies
-//           }
-//         });
-//       }
-//       result.outboundDelivery = "Items Updated";
-//     }
- 
-   
- 
-//     /* ==========================
-//        3️⃣ POST GOODS ISSUE
-//     ========================== */
-//     if (GoodsIssue?.DeliveryDocument) {
- 
-//       const { token, cookies } = await fetchCsrfTokenGoodsIssue();
- 
-//       const giResp = await sapAxiosOBD.post(
-//         `/PostGoodsIssue?DeliveryDocument='${encodeURIComponent(GoodsIssue.DeliveryDocument)}'`,
-//         {},
-//         {
-//           headers: {
-//             "x-csrf-token": token,
-//             "If-Match": "*",
-//             Cookie: cookies
-//           }
-//         }
-//       );
- 
-//       if (giResp.status !== 200 && giResp.status !== 201) {
-//         return res.status(400).json({ error: "Goods Issue Failed" });
-//       }
- 
-//       result.goodsIssue = "Posted";
- 
-//       /* ==========================
-//          4️⃣ CREATE BILLING
-//       ========================== */
- 
-//       const billingPayload = {
-//         "_Control": {
-//           "DefaultBillingDocumentType": "F2",
-//           "AutomPostingToAcctgIsDisabled": false
-//         },
-//         "_Reference": [
-//           {
-//             "SDDocument": GoodsIssue.DeliveryDocument,
-//             "SDDocumentCategory": "J"
-//           }
-//         ]
-//       };
- 
-//       const billingResp = await sapAxiosBilling.post(
-//         `/BillingDocument/SAP__self.CreateFromSDDocument?DeliveryDocument='${encodeURIComponent(GoodsIssue.DeliveryDocument)}'`,
-//         billingPayload,
-//         {
-//           headers: {
-//             "x-csrf-token": token,
-//             "If-Match": "*",
-//             Cookie: cookies
-//           }
-//         }
-//       );
- 
-//       result.billing =
-//         billingResp.data?.value?.[0]?.BillingDocument ||
-//         billingResp.data?.BillingDocument;
-//     }
- 
-//     return res.json({
-//       success: true,
-//       result
-//     });
- 
-//   } catch (err) {
-//     console.error("Combined Flow Error:", err?.response?.data || err.message);
-//     return res.status(500).json({
-//       error: err?.response?.data?.error?.message?.value
-//   || err.message
-//     });
-//   }
-// });
- 
  
  app.post('/api/goodsissue-and-invoice-int', async (req, res) => {
   try {
@@ -4329,7 +3910,7 @@ await transporter.sendMail({
   from: mailConfig.user, // your client mail
   to: customerEmail, // dynamic customer email
   subject: `Billing Document PDF - ${billingDocNumber}`,
-  text: `Please find attached the billing document PDF for Delivery Document: ${deliveryDocument}`,
+  text: `Please find attached the billing document PDF for Billing Document: ${billingDocNumber}`,
   attachments: [
     {
       filename: `Billing_${billingDocNumber}.pdf`,
@@ -4473,13 +4054,17 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
     }
     if (WeighmentUpdate.NetWeight === null || WeighmentUpdate.NetWeight === undefined || WeighmentUpdate.NetWeight.length === 0) {
       return res.status(400).json({ error: 'NetWeight is required in the request body' });  }
+
+    if (WeighmentUpdate.Status === 'Cancelled' ) {
+      return res.status(400).json({ error: 'Weighment status is cancelled' });  }
+
     if (WeighmentUpdate.GrossWeight === null || WeighmentUpdate.GrossWeight === undefined || WeighmentUpdate.GrossWeight.length === 0) {
       return res.status(400).json({ error: 'GrossWeight is required in the request body' });  }
-   // if (Number(WeighmentUpdate.NetWeight) < 100) {
-   //  return res.status(400).json({error: "NetWeight should be greater than 99",
-   //   DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument    });   }
+    if (Number(WeighmentUpdate.NetWeight) < 0.100) {
+     return res.status(400).json({error: "NetWeight should be greater than 99 KG",
+      DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument    });   }
  
-    if (Number(WeighmentUpdate?.NetWeight) < 100) {
+    if (Number(WeighmentUpdate?.NetWeight) < 0.100) {
  
      const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
  
@@ -4494,7 +4079,7 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
       });
  
       return res.status(400).json({
-       message: "NetWeight below 100. Outbound Delivery Deleted",
+       message: "NetWeight below 99 KG. Outbound Delivery Deleted",
        DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument
        });
       }
@@ -4515,7 +4100,7 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
       );
       uuid = getResp.data?.d?.results?.[0]?.SAP_UUID;
     }
-      console.log(getResp?.data?.d?.results?.[0], "getResp data");
+      console.log(getResp?.data?.d?.results?.[0], "Weighement response getResp data");
  
     /* ==========================
        1️⃣ UPDATE WEIGHMENT
@@ -4548,6 +4133,21 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
   if (isNaN(d.getTime())) return null;
   return `/Date(${d.getTime()})/`;
 }
+
+function formatSapTime(timeStr) {
+  if (!timeStr) return null;
+
+  // If already SAP format → return as is
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
+
+const now = new Date();
+const systemdate = now.toISOString().split("T")[0];
+const systemtime = now.toTimeString().split(" ")[0];
     if (OutboundDeliveryUpdate?.DeliveryDocument && OutboundDeliveryUpdate?.Items?.length) {
             for (const item of OutboundDeliveryUpdate.Items) {
             const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
@@ -4558,6 +4158,8 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
               YY1_WeighbridgeTime_DLH: formatSapTime(getResp?.data?.d?.results?.[0]?.OutwardTime),
               YY1_WeighbridgeNo_DLH: String(getResp?.data?.d?.results?.[0]?.WeightDocNumber || '').trim(),
               YY1_GrossWeight_DLH: item.GrossWeight,
+              YY1_PGIDate_DLH: formatSapODataDate(systemdate),
+              YY1_PGITime_DLH: formatSapTime(systemtime),
               // Add other custom header fields as needed
             };
             await sapAxiosOBD.patch(headerPath, headerPayload, {
@@ -4768,6 +4370,43 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
      } catch (printErr) {
      console.error("❌ Failed to print billing PDF:", printErr?.message);
      }
+
+     (async () => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Existing billing PDF logic...
+
+    // ✅ ADD THIS HERE (WEIGHMENT PRINT)
+    const weighmentData = getResp?.data?.d?.results?.[0];
+
+    console.log("Weighment data:", weighmentData);
+
+    const slipBuffer = await generateWeighmentSlip({
+      WeightDocNumber: weighmentData.WeightDocNumber,
+      GateEntryNumber: weighmentData.GateEntryNumber,
+      VehicleNumber: weighmentData.VehicleNumber,
+      Party: weighmentData.Party,
+      Transporter: weighmentData.Transporter,
+      Material: weighmentData.MaterialDescription,
+      GrossWeight: weighmentData.GrossWeight,
+      TareWeight: weighmentData.TareWeight,
+      NetWeight: weighmentData.NetWeight,
+      InwardTime: formatSapTime(weighmentData.InwardTime),
+      OutwardTime: formatSapTime(weighmentData.OutwardTime)
+    });
+
+    await axios.post("http://localhost:4600/api/printer/print", {
+      pdfBase64: slipBuffer.toString("base64"),
+      fileName: `Weighment_${weighmentData.GateEntryNumber}.pdf`
+    });
+
+    console.log("✅ Weighment slip printed");
+
+  } catch (err) {
+    console.error("Weighment print error:", err.message);
+  }
+})();
           } catch (pdfError) {
             console.error(`PDF download/email failed for ${billingDocNumber}:`, pdfError.message);
           }
@@ -4775,6 +4414,7 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
         return;
       }
     }
+
     return res.json({
       success: true,
       result
@@ -4789,6 +4429,61 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
   }
 });
  
+//const PDFDocument = require("pdfkit");
+
+function generateWeighmentSlip(data) {
+  return new Promise((resolve) => {
+    const doc = new PDFDocument({ size: "A4", margin: 30 });
+    const buffers = [];
+
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => resolve(Buffer.concat(buffers)));
+
+    // HEADER
+    doc.fontSize(16).text("Minera Steel & Power Pvt Ltd", { align: "center" });
+    doc.fontSize(10).text("Factory Address: Yerabanahalli Village Sandur taluk Ballari", { align: "center" });
+    doc.moveDown();
+
+    doc.fontSize(14).text("Weighbridge Ticket", { align: "center" });
+    doc.moveDown();
+
+    // DATE & TIME
+    doc.fontSize(10);
+    doc.text(`Print Date: ${new Date().toLocaleDateString()}`);
+    doc.text(`Time: ${new Date().toLocaleTimeString()}`);
+    doc.moveDown();
+
+    doc.text("------------------------------------------------------------");
+
+    // LEFT SIDE
+    doc.text(`Weighment No : ${data.WeightDocNumber}`);
+    doc.text(`Gate Entry No: ${data.GateEntryNumber}`);
+    doc.text(`Truck Number : ${data.VehicleNumber}`);
+    doc.text(`Party        : ${data.Party}`);
+    doc.text(`Transporter  : ${data.Transporter}`);
+
+    doc.moveDown();
+
+    // RIGHT SIDE
+    doc.text(`Product      : ${data.Material}`);
+    doc.text(`Gross Weight : ${data.GrossWeight} t`);
+    doc.text(`Tare Weight  : ${data.TareWeight} t`);
+    doc.text(`Net Weight   : ${data.NetWeight} t`);
+
+    doc.moveDown();
+
+    // TIME DETAILS
+    doc.text(`In Time  : ${data.InwardTime}`);
+    doc.text(`Out Time : ${data.OutwardTime}`);
+
+    doc.moveDown();
+
+    doc.text("------------------------------------------------------------");
+    doc.text("Note: This vehicle weighment includes driver weight");
+
+    doc.end();
+  });
+}
 
 // // GET /api/material-trucks?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD
 //   app.get("/api/material-trucks", async (req, res) => {
@@ -5182,10 +4877,10 @@ app.post('/api/create-grn', async (req, res) => {
         console.log('Fetched PO Item:', item.PurchaseOrder);
         // Build GRN payload
         const grnPayload = {
-          DocumentDate: entry.GateEntryDate,
+          DocumentDate: entry.VendorInvoiceDate,
           PostingDate: entry.GateEntryDate,
-          MaterialDocumentHeaderText: `Gate Entry${entryNum}`,
-          ReferenceDocument: entry.PurchaseOrderNumber,
+          MaterialDocumentHeaderText: `${entryNum}`,
+          ReferenceDocument: entry.VendorInvoiceNumber,
           GoodsMovementCode: "01",
           to_MaterialDocumentItem: {
             results: [
