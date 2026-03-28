@@ -74,6 +74,8 @@ export default function CreateHeader() {
       initialState[`VendorInvoiceWeight${suffix}`] = "";
       initialState[`BalanceQty${suffix}`] = "";
     }
+    // Add BalanceQty3 for PO Quantity (if not already present)
+    if (!initialState.BalanceQty3) initialState.BalanceQty3 = "";
 
     return initialState;
   };
@@ -200,11 +202,13 @@ export default function CreateHeader() {
       try {
         const resp = await fetchPurchaseOrderByPermitNumber(permitNumber);
         if (!cancelled && resp.data && resp.data.PurchaseOrder) {
+          const poQty = resp.data.items?.[0]?.OrderQuantity || '';
           setHeader(prev => (prev.PermitNumber === permitNumber
             ? {
                 ...prev,
                 PurchaseOrderNumber: resp.data.PurchaseOrder,
-                BalanceQty: resp.data.items?.[0]?.OrderQuantity || ''
+                BalanceQty: poQty,
+                BalanceQty3: poQty // Set PO Quantity in BalanceQty3 as well
               }
             : prev));
         }
@@ -1187,6 +1191,10 @@ export default function CreateHeader() {
               <div className="form-group">
                 <label className="form-label">Balance Quantity</label>
                 <input className="form-input" name="BalanceQty" type="text" inputMode="decimal" value={header.BalanceQty} onChange={handleChange} placeholder="0.000" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PO Quantity</label>
+                <input className="form-input" name="BalanceQty3" type="text" inputMode="decimal" value={header.BalanceQty3} onChange={handleChange} placeholder="0.000" />
               </div>
             </div>
           </div>
