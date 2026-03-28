@@ -494,6 +494,18 @@ function formatSapODataDate(date) {
   if (isNaN(d.getTime())) return null;
   return `/Date(${d.getTime()})/`;
 }
+function formatSapTime(timeStr) {
+  if (!timeStr) return null;
+
+  // If already SAP format → return as is
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+
+  // If normal format → convert
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
     // 1) Update Outbound Delivery item with Net Weight
 await updateOutboundDelivery(deliveryDoc, itemNumber, {
   item: {
@@ -503,6 +515,9 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
     YY1_GrossWeight_DLH: form.GrossWeight,
     YY1_WeighbridgeNo_DLH: form.WeightDocNumber,
     YY1_WeighbridgeDate_DLH: formatSapODataDate(form.GateEntryDate),
+    YY1_WeighbridgeTime_DLH: formatSapTime(form.OutwardTime),
+    YY1_PGIDate_DLH: formatSapODataDate(form.GateEntryDate),
+    YY1_PGITime_DLH: formatSapTime(form.OutwardTime),
    // YY1_WeighbridgeTime_DLH: new Date().toISOString().slice(11, 19)
   }
 });
@@ -575,6 +590,25 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
   }
 };
 
+const handleCombinedAction = async () => {
+  setLoading(true);
+  setError(null);
+  setResult(null);
+  try {
+    // 1. Capture Tare Weight & Calculate
+    await onSubmit({ preventDefault: () => {} });
+    // Only proceed if no error
+    if (error) return;
+    // 2. Create Goods Issue
+    await handleGoodsIssue();
+    // If both succeed, set a combined result
+    setResult('Tare Weight captured, calculated, and Goods Issue created successfully!');
+  } catch (err) {
+    setError(err.message || 'Unknown error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="create-header-container">
@@ -836,7 +870,7 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
         )}
 
         <div className="form-actions">
-          <button type="button" className="btn btn-primary" disabled={loading || !recordFound} onClick={onSubmit}>
+          {/* <button type="button" className="btn btn-primary" disabled={loading || !recordFound} onClick={onSubmit}>
             {loading ? 'Updating...' : 'Capture Tare Weight & Calculate'}
           </button>
           <button
@@ -848,21 +882,29 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
             }}
           >
             Reset
-          </button>
+          </button> */}
         </div>
       </form>
 
       {recordFound && (
-        <div className="form-actions" style={{ marginTop: 16 }}>
-          <button
-            type="button"
-            className="btn btn-success"
-            onClick={handleGoodsIssue}
-            disabled={loading}
-          >
-            {loading ? 'Processing...' : 'Create Goods Issue'}
-          </button>
-        </div>
+        // <div className="form-actions" style={{ marginTop: 16 }}>
+        //   <button
+        //     type="button"
+        //     className="btn btn-success"
+        //     onClick={handleGoodsIssue}
+        //     disabled={loading}
+        //   >
+        //     {loading ? 'Processing...' : 'Create Goods Issue'}
+        //   </button>
+        // </div>
+        <button
+  type="button"
+  className="btn btn-success"
+  disabled={loading || !recordFound}
+  onClick={handleCombinedAction}
+>
+  {loading ? 'Processing...' : 'Goods Issue & Capture Tare Weight & Calculate'}
+</button>
       )}
 
       {error && (
