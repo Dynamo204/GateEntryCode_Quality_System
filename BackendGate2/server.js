@@ -4695,99 +4695,69 @@ function processData(data, indicator, today) {
 
 // Material & Product List with Search and Merged Data
 
+
 app.get('/api/products', async (req, res) => {
   const { search } = req.query;
- 
   try {
- 
     let productUrl = `/Product?$format=json`;
- 
-    if (search) {
-      productUrl =
-        `/Product?$filter=contains(Product,'${search}')&$format=json`;
-    }
- 
+    // Always fetch all products, filter later
     const productResp = await sapAxiosProduct.get(productUrl);
     const products = productResp.data.value || [];
- 
-    const productIds = products
-      .map(p => p.Product)
-      .filter(Boolean);
- 
+
+    const productIds = products.map(p => p.Product).filter(Boolean);
     if (productIds.length === 0) {
       return res.json([]);
     }
-  const descFilter = productIds
+    const descFilter = productIds
       .map(id => `(Product eq '${id}' and Language eq 'EN')`)
       .join(' or ');
- 
-    const descUrl =
-      `/ProductDescription?$filter=${encodeURIComponent(descFilter)}&$format=json`;
- 
+    const descUrl = `/ProductDescription?$filter=${encodeURIComponent(descFilter)}&$format=json`;
     const descResp = await sapAxiosProduct.get(descUrl);
     const descriptions = descResp.data.value || [];
- 
-    console.log("Descriptions fetched:", descriptions.length);
- 
-    const plantFilter = productIds
-      .map(id => `Product eq '${id}'`)
-      .join(' or ');
- 
-    const plantUrl =
-      `/ProductPlant?$filter=${encodeURIComponent(plantFilter)}&$format=json`;
- 
+
+    const plantFilter = productIds.map(id => `Product eq '${id}'`).join(' or ');
+    const plantUrl = `/ProductPlant?$filter=${encodeURIComponent(plantFilter)}&$format=json`;
     const plantResp = await sapAxiosProduct.get(plantUrl);
     const plants = plantResp.data.value || [];
- 
-    console.log("Plants fetched:", plants.length);
- 
+
     const descMap = {};
- 
     descriptions.forEach(d => {
       if (d.Product && !descMap[d.Product]) {
         descMap[d.Product] = d.ProductDescription;
       }
     });
- 
     const plantMap = {};
- 
     plants.forEach(pl => {
- 
       if (!pl.Product) return;
- 
       if (!plantMap[pl.Product]) {
         plantMap[pl.Product] = [];
       }
- 
       plantMap[pl.Product].push(pl.Plant);
- 
     });
-    const result = products.map(p => ({
- 
+
+    // Merge all data
+    let result = products.map(p => ({
       Product: p.Product,
       ProductType: p.ProductType,
       BaseUnit: p.BaseUnit,
- 
-      Description:
-        descMap[p.Product] || "",
- 
-      Plant:
-        plantMap[p.Product]
-          ? plantMap[p.Product].join(', ')
-          : ""
- 
+      Description: descMap[p.Product] || "",
+      Plant: plantMap[p.Product] ? plantMap[p.Product].join(', ') : ""
     }));
- 
+
+    // If search is present, filter by Product or Description (case-insensitive, partial match)
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase();
+      result = result.filter(
+        p =>
+          (p.Product && String(p.Product).toLowerCase().includes(s)) ||
+          (p.Description && String(p.Description).toLowerCase().includes(s))
+      );
+    }
+
     res.json(result);
- 
   } catch (err) {
- 
     console.error('Product list error:', err.response?.data || err.message);
- 
-    res.status(500).json({
-      error: 'Failed to fetch products'
-    });
- 
+    res.status(500).json({ error: 'Failed to fetch products' });
   }
 });
  

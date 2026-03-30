@@ -772,38 +772,8 @@ export default function CreateHeader() {
   // Auto-parse remarks and map fields if remarks is pipe-delimited and not already mapped
   useEffect(() => {
     if (header.Remarks && (header.Remarks.match(/\|/g) || []).length >= 4) {
-      const fields = parseQRRemarks(header.Remarks);
-      const parsedVehicle = String(fields.TruckNumber || '').trim();
-      const currentVehicle = String(header.VehicleNumber || '').trim();
-      const parsedInvoice = String(fields.VendorInvoiceNumber || '').trim();
-      const currentInvoice = String(header.VendorInvoiceNumber || '').trim();
-
-      // Update when parsed value is brand new OR a fuller continuation of current partial value.
-      const shouldUpdateVehicle = Boolean(parsedVehicle) && (
-        !currentVehicle || parsedVehicle === currentVehicle || parsedVehicle.startsWith(currentVehicle)
-      );
-      const shouldUpdateInvoice = Boolean(parsedInvoice) && (
-        !currentInvoice || parsedInvoice === currentInvoice || parsedInvoice.startsWith(currentInvoice)
-      );
-
-      if (
-        shouldUpdateInvoice ||
-        shouldUpdateVehicle
-      ) {
-        setHeader(prev => ({
-          ...prev,
-          PermitNumber: fields.PermitNumber || prev.PermitNumber,
-          LRGCNumber: fields.PermitNumber || fields.mteNumber || prev.LRGCNumber,
-          VendorInvoiceDate: fields.VendorInvoiceDate || prev.VendorInvoiceDate,
-          VendorInvoiceNumber: shouldUpdateInvoice ? parsedInvoice : prev.VendorInvoiceNumber,
-          VendorInvoiceWeight: fields.VendorInvoiceWeight || prev.VendorInvoiceWeight,
-          // GrossWeight should be entered manually in inward screen.
-          GrossWeight: prev.GrossWeight,
-          VehicleNumber: shouldUpdateVehicle ? parsedVehicle : prev.VehicleNumber,
-          Division: fields.location || prev.Division,
-          // Remarks: prev.Remarks // don't overwrite
-        }));
-      }
+      // Always call handleQRRemarks to set all fields, including BalanceQty
+      handleQRRemarks(header.Remarks);
     }
   }, [header.Remarks]);
 
@@ -1295,19 +1265,97 @@ const remarks = "25267031B000010 | 25267031T004063 | 19.26 | 16/10/2025 9:23 PM 
 const fields = parseQRRemarks(remarks);
 console.log(fields);
 
-const handleQRRemarks = (remarks) => {
+
+
+
+// Helper: Fetch latest valid (non-cancelled) Gate Entry for a PO, using GateEntryDate and InwardTime
+function parseSapDurationToSeconds(duration) {
+  // SAP duration format: PT14H22M41S
+  if (!duration || typeof duration !== 'string') return 0;
+  const m = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  const h = parseInt(m[1] || '0', 10);
+  const min = parseInt(m[2] || '0', 10);
+  const s = parseInt(m[3] || '0', 10);
+  return h * 3600 + min * 60 + s;
+}
+
+async function fetchLatestValidGateEntryForPO(poNumber) {
+  try {
+    // Query all gate entries for the PO
+    const resp = await fetchGateEntryByNumber(`$filter=PurchaseOrderNumber eq '${poNumber}'`);
+    const entries = resp?.data?.d?.results || resp?.data?.value || [];
+    // Sort by GateEntryDate desc, then InwardTime desc
+    const sorted = entries.slice().sort((a, b) => {
+      let dateA = a.GateEntryDate || a["d:GateEntryDate"] || 0;
+      let dateB = b.GateEntryDate || b["d:GateEntryDate"] || 0;
+      dateA = typeof dateA === 'string' ? new Date(dateA) : dateA;
+      dateB = typeof dateB === 'string' ? new Date(dateB) : dateB;
+      if (dateA.getTime() !== dateB.getTime()) return dateB - dateA;
+      const tA = parseSapDurationToSeconds(a.InwardTime || a["d:InwardTime"]);
+      const tB = parseSapDurationToSeconds(b.InwardTime || b["d:InwardTime"]);
+      return tB - tA;
+    });
+    // Find the latest non-cancelled entry
+    for (const entry of sorted) {
+      if (String(entry.Status || entry["d:Status"] || "").toUpperCase() !== "CANCELLED") {
+        return entry;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn("Failed to fetch gate entries for PO", poNumber, err);
+    return null;
+  }
+}
+
+// Updated QR remarks handler with correct balance/material logic
+const handleQRRemarks = async (remarks) => {
   const fields = parseQRRemarks(remarks);
+  let poNumber = fields.PurchaseOrderNumber || fields.poNumber || fields.PermitNumber || "";
+  poNumber = String(poNumber).trim();
+
+  let material = fields.material || "";
+  let materialDescription = fields.grade || "";
+  let balanceQty = "";
+  let poQty = "";
+
+  if (poNumber) {
+    // 1. Always get PO master for PO quantity and fallback material/desc
+    try {
+      const resp = await fetchPurchaseOrderByNumber(poNumber);
+      const items = resp?.data?.items || resp?.data?.d?.results || resp?.data?.value || [];
+      const firstItem = items[0] || {};
+      if (!material) material = firstItem.Material || material;
+      if (!materialDescription) materialDescription = firstItem.MaterialDescription || materialDescription;
+      poQty = firstItem.OrderQuantity || poQty;
+    } catch (err) {
+      // ignore
+    }
+    // 2. Only get balanceQty from latest valid entry (by GateEntryDate/InwardTime)
+    const latestEntry = await fetchLatestValidGateEntryForPO(poNumber);
+    if (latestEntry) {
+      material = latestEntry.Material || latestEntry["d:Material"] || material;
+      materialDescription = latestEntry.MaterialDescription || latestEntry["d:MaterialDescription"] || materialDescription;
+      balanceQty = String(latestEntry.BalanceQty || latestEntry["d:BalanceQty"] || "");
+    } else {
+      // No valid gate entry: leave balanceQty blank
+      balanceQty = "";
+    }
+  }
+
   setHeader(prev => ({
     ...prev,
     PermitNumber: fields.PermitNumber || prev.PermitNumber,
     VendorInvoiceNumber: fields.VendorInvoiceNumber || prev.VendorInvoiceNumber,
     VendorInvoiceWeight: fields.VendorInvoiceWeight || prev.VendorInvoiceWeight,
-    // Keep manual inward gross weight; do not auto-fill from scan remarks.
     GrossWeight: prev.GrossWeight,
     VehicleNumber: fields.TruckNumber || prev.VehicleNumber,
     LRGCNumber: fields.PermitNumber || fields.mteNumber || prev.LRGCNumber,
-    Material: fields.material || prev.Material,
-    MaterialDescription: fields.grade || prev.MaterialDescription,
+    Material: material || prev.Material,
+    MaterialDescription: materialDescription || prev.MaterialDescription,
+    BalanceQty: balanceQty, // Only from latest valid gate entry, never PO qty
+    BalanceQty3: poQty || prev.BalanceQty3,
     Division: fields.location || prev.Division,
     Remarks: remarks
   }));

@@ -1,3 +1,12 @@
+  // Print weighment slip
+  const handlePrintSlip = () => {
+    const printContents = document.getElementById('weighment-slip-print-area').innerHTML;
+    const originalContents = document.body.innerHTML;
+    document.body.innerHTML = printContents;
+    window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload(); // reload to restore event handlers
+  };
 // Version 6 - Create Gate Entry + Material Inward (Weight Document) together
 import React, { useState, useEffect, useRef } from "react";
 import { createHeader, createMaterialInward, sendEmailNotification,fetchPurchaseOrderByPermitNumber ,
@@ -89,13 +98,12 @@ export default function CreateHeader() {
   };
 
   const [header, setHeader] = useState(createInitialHeaderState());
+  // Store the original BalanceQty fetched from backend for calculation
+  const originalBalanceQtyRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [tareWeightLoading, setTareWeightLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  // Weighment slip modal state
-  const [showSlipModal, setShowSlipModal] = useState(false);
-  const [slipData, setSlipData] = useState(null);
   const [scanFetchTick, setScanFetchTick] = useState(0);
   const [selectedInboundRecord, setSelectedInboundRecord] = useState(null);
   const [transporterDropdown, setTransporterDropdown] = useState({
@@ -236,9 +244,7 @@ export default function CreateHeader() {
         WeightDocNumber: toFieldString(record.WeightDocNumber, prev.WeightDocNumber),
         GateEntryDate: toInputDate(record.HeaderGateEntryDate || record.GateEntryDate, prev.GateEntryDate),
         InwardTime: sapDurationToClock(record.InwardTime, prev.InwardTime),
-        // Fix: Map GateOutDate and OutwardTime from record if present
-        GateOutDate: toInputDate(record.GateOutDate, prev.GateOutDate),
-        OutwardTime: sapDurationToClock(record.OutwardTime || record.HeaderOutwardTime, prev.OutwardTime),
+        OutwardTime: sapDurationToClock(record.HeaderOutwardTime || record.OutwardTime, prev.OutwardTime),
         VehicleNumber: toFieldString(record.HeaderVehicleNumber || record.TruckNumber || record.VehicleNumber, prev.VehicleNumber),
         TransporterCode: toFieldString(record.TransporterCode, prev.TransporterCode),
         TransporterName: toFieldString(record.TransporterName, prev.TransporterName),
@@ -1041,7 +1047,11 @@ export default function CreateHeader() {
         grade: header.MaterialDescription,
       });
     }
-  }, [header.VendorInvoiceNumber, header.VehicleNumber, header.PermitNumber, header.Material, header.MaterialDescription, scanFetchTick, pageMode]);
+    // Store the original BalanceQty from backend if not already set
+    if (header.BalanceQty && originalBalanceQtyRef.current === null) {
+      originalBalanceQtyRef.current = parseFloat(header.BalanceQty);
+    }
+  }, [header.VendorInvoiceNumber, header.VehicleNumber, header.PermitNumber, header.Material, header.MaterialDescription, scanFetchTick, pageMode, header.BalanceQty]);
 
   // Direct lookup by gate entry number in outward screen.
   // Skip if selectedInboundRecord is already set — means the scan path already resolved it.
@@ -1163,17 +1173,12 @@ export default function CreateHeader() {
       // Use the correct field for UUID/guid (adjust as per SAP response)
       const weightUuid = record?.WeightSAPUUID || '';
 
-      const tareRaw = String(header.TareWeight || '').trim();
-      const grossRaw = String(header.GrossWeight || '').trim();
-      const netRaw = String(header.NetWeight || '').trim();
-
-      const tareNum = tareRaw === '' ? NaN : Number(tareRaw);
-      const grossNum = grossRaw === '' ? NaN : Number(grossRaw);
-      const netNumFromField = netRaw === '' ? NaN : Number(netRaw);
-      const derivedNet = Number.isFinite(grossNum) && Number.isFinite(tareNum)
-        ? (grossNum - tareNum)
-        : NaN;
-      const netNum = Number.isFinite(netNumFromField) ? netNumFromField : derivedNet;
+      // Always recalculate NetWeight and BalanceQty here for backend update
+      const tareNum = parseFloat(header.TareWeight) || 0;
+      const grossNum = parseFloat(header.GrossWeight) || 0;
+      const netNum = grossNum - tareNum;
+      const originalBalance = originalBalanceQtyRef.current !== null ? originalBalanceQtyRef.current : parseFloat(header.BalanceQty) || 0;
+      const newBalance = Math.max(0, originalBalance - netNum);
 
       if (!Number.isFinite(tareNum)) {
         setError('Please enter valid Tare Weight before OUT submit.');
@@ -1193,11 +1198,18 @@ export default function CreateHeader() {
         return;
       }
 
-      if (!Number.isFinite(netNum)) {
+      if (!Number.isFinite(netNum) || netNum < 0) {
         setError('Net Weight is invalid. Please check Gross and Tare weight.');
         setLoading(false);
         return;
       }
+
+      // Update NetWeight and BalanceQty in state for UI consistency
+      setHeader(prev => ({
+        ...prev,
+        NetWeight: netNum.toFixed(3),
+        BalanceQty: newBalance.toFixed(3)
+      }));
 
       // Weight entity update: only outward-relevant weights.
       if (weightUuid) {
@@ -1213,38 +1225,18 @@ export default function CreateHeader() {
       const ss = String(new Date().getSeconds()).padStart(2, '0');
       const outwardClock = `${hh}:${mm}:${ss}`;
 
-      // Header entity update: only status + outward timestamp fields.
+      // Header entity update: status, weights, balance qty, and outward timestamp fields.
       await updateHeaderByKey(record.GateEntryNumber, {
         VehicleStatus: 'OUT',
         TareWeight: tareNum.toFixed(3),
         NetWeight: netNum.toFixed(3),
+        BalanceQty: newBalance.toFixed(3),
         GateOutDate: outwardDate,
         OutwardTime: hhmmssToSapDuration(outwardClock),
       });
 
       setResult(`✅ Vehicle OUT saved for Gate Entry ${record.GateEntryNumber}`);
-
-      // Prepare slip data from OUT transaction
-      setSlipData({
-        gateEntryNo: record.GateEntryNumber,
-        truckNumber: record.VehicleNumber,
-        grossWeight: record.GrossWeight,
-        tareWeight: tareNum.toFixed(3),
-        netWeight: netNum.toFixed(3),
-        poNumber: record.PurchaseOrderNumber,
-        product: record.MaterialDescription,
-        transporter: record.TransporterName,
-        challanNo: record.LRGCNumber,
-        challanWeight: record.VendorInvoiceWeight,
-        dateIn: record.GateEntryDate,
-        timeIn: record.InwardTime,
-        dateOut: outwardDate,
-        timeOut: outwardClock,
-        printDate: new Date().toLocaleDateString(),
-        printTime: new Date().toLocaleTimeString(),
-      });
-      setShowSlipModal(true);
-      // Do not reset form automatically after scan out. Only reset on manual refresh.
+      setTimeout(() => resetForm(), 3000);
     } catch (err) {
       console.error('Update error:', err?.response?.data || err);
       const msg = extractErrorMessage(err);
@@ -1252,199 +1244,6 @@ export default function CreateHeader() {
     } finally {
       setLoading(false);
     }
-  };
-  // Helper: Format SAP/ISO date or duration for print slip
-  const formatDate = (val) => {
-    if (!val) return '';
-    if (typeof val === 'string' && val.startsWith('/Date(')) {
-      // SAP OData format: /Date(1710115200000)/
-      const ms = parseInt(val.replace(/\D/g, ''), 10);
-      if (!isNaN(ms)) {
-        const d = new Date(ms);
-        return d.toLocaleDateString();
-      }
-    }
-    if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
-      // ISO date
-      return new Date(val).toLocaleDateString();
-    }
-    return val;
-  };
-  const formatTime = (val) => {
-    if (!val) return '';
-    if (/^PT(\d{2})H(\d{2})M(\d{2})S$/.test(val)) {
-      // SAP duration PT16H42M16S
-      const m = val.match(/^PT(\d{2})H(\d{2})M(\d{2})S$/);
-      if (m) return `${m[1]}:${m[2]}:${m[3]}`;
-    }
-    if (/^\d{2}:\d{2}:\d{2}$/.test(val)) return val;
-    return val;
-  };
-
-  // Helper: Render all fields with technical names
-  // Helper: Render all fields in fixed order and columns to match sample slip
-  const renderAllFieldsTable = (data) => {
-    // Map slip fields to backend XML technical field names
-    const leftFields = [
-      ['Transaction No.', 'GateEntryNumber'],
-      ['Truck Number', 'VehicleNumber'],
-      ['Product Code', 'Material'],
-      ['Party Code', 'PartyCode'],
-      ['Transporter Code', 'TransporterCode'],
-      ['Challan Number', 'PermitNumber'],
-      ['Challan Weight', 'VendorInvoiceWeight'],
-      ['Miscellaneous', 'Miscellaneous'],
-      ['', ''], // blank row for Miscellaneous 2
-      ['Delivery Note', 'DeliveryNote'],
-      ['Shift', 'Shift'],
-      ['Date In', 'GateEntryDate'],
-      ['Date Out', 'GateOutDate'], // will format below
-    ];
-    const rightFields = [
-      ['PO Number', 'PurchaseOrderNumber'],
-      ['Product Name', 'MaterialDescription'],
-      ['Party', 'Party'],
-      ['Transporter Name', 'TransporterName'],
-      ['Challan Date', 'VendorInvoiceDate'],
-      ['Batch', 'Batch'],
-      ['Sub Transporter Name', 'SubTransporterName'],
-      ['', ''], // blank row for Miscellaneous 2
-      ['', ''], // blank row for Delivery Note
-      ['', ''], // blank row for Shift
-      ['Time In', 'InwardTime'],
-      ['Time Out', 'OutwardTime'], // will format below
-    ];
-
-    // Render rows
-    let rows = '';
-    for (let i = 0; i < leftFields.length; i++) {
-      const [leftLabel, leftKey] = leftFields[i];
-      const [rightLabel, rightKey] = rightFields[i] || ['', ''];
-      let leftVal = '';
-      let rightVal = '';
-      if (leftKey === 'GateOutDate') {
-        leftVal = data.GateOutDate ? formatDate(data.GateOutDate) : '';
-      } else if (leftKey === 'GateEntryDate') {
-        leftVal = data.GateEntryDate ? formatDate(data.GateEntryDate) : '';
-      } else if (leftKey) {
-        leftVal = data[leftKey] !== undefined ? data[leftKey] : '';
-      }
-      if (rightKey === 'OutwardTime') {
-        rightVal = data.OutwardTime ? formatTime(data.OutwardTime) : '';
-      } else if (rightKey === 'InwardTime') {
-        rightVal = data.InwardTime ? formatTime(data.InwardTime) : '';
-      } else if (rightKey) {
-        rightVal = data[rightKey] !== undefined ? data[rightKey] : '';
-      }
-      // Format other dates/times
-      if (/date/i.test(leftKey) && leftKey !== 'GateOutDate' && leftKey !== 'GateEntryDate') leftVal = leftVal ? formatDate(leftVal) : '';
-      if (/time/i.test(leftKey) && leftKey !== 'OutwardTime' && leftKey !== 'InwardTime') leftVal = leftVal ? formatTime(leftVal) : '';
-      if (/date/i.test(rightKey) && rightKey !== 'GateOutDate' && rightKey !== 'GateEntryDate') rightVal = rightVal ? formatDate(rightVal) : '';
-      if (/time/i.test(rightKey) && rightKey !== 'OutwardTime' && rightKey !== 'InwardTime') rightVal = rightVal ? formatTime(rightVal) : '';
-      rows += `<tr><td class=\"label\">${leftLabel}</td><td class=\"val\">${leftVal}</td><td class=\"label\">${rightLabel}</td><td class=\"val\">${rightVal}</td></tr>`;
-    }
-    return `<table class=\"section-table\">${rows}</table>`;
-  };
-
-  // Generate weighment slip HTML (dynamic, all fields, technical names)
-  const generateSlipHTML = (data) => `
-    <html>
-      <head>
-        <title>Weighment Slip</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-          .slip-container {
-            width: 900px;
-            margin: 0 auto;
-            border: 2px solid #222;
-            padding: 24px 32px 18px 32px;
-            box-sizing: border-box;
-            min-height: 520px;
-            background: #fff;
-          }
-          .header-row {
-            display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0;
-          }
-          .header-title {
-            font-size: 1.45rem; font-weight: bold; letter-spacing: 0.02em;
-          }
-          .logo-img { height: 60px; margin-left: 18px; }
-          .ticket-title { text-align: left; font-size: 1.18rem; font-weight: bold; margin: 18px 0 0 0; }
-          .meta-row {
-            display: flex; justify-content: space-between; font-size: 1.08rem; margin: 8px 0 0 0; font-weight: 500;
-          }
-          .meta-row b { font-size: 1.13rem; }
-          .divider {
-            border-top: 2px dashed #222; margin: 10px 0 12px 0;
-          }
-          .section-table {
-            width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 1.08rem;
-          }
-          .section-table td { padding: 2px 8px 2px 0; vertical-align: top; }
-          .section-table .label { font-weight: bold; width: 170px; }
-          .section-table .label2 { font-weight: bold; width: 120px; }
-          .section-table .label3 { font-weight: bold; width: 110px; }
-          .section-table .label4 { font-weight: bold; width: 140px; }
-          .section-table .label5 { font-weight: bold; width: 100px; }
-          .section-table .val { font-weight: normal; }
-          .section-table .val2 { font-weight: normal; }
-          .section-table .val3 { font-weight: normal; }
-          .section-table .val4 { font-weight: normal; }
-          .section-table .val5 { font-weight: normal; }
-          .section-table tr { line-height: 1.45; }
-          .section-table td[colspan] { font-weight: bold; }
-          .section-table td { font-size: 1.07rem; }
-          .section-table .empty { color: #bbb; }
-          .note { font-size: 0.98rem; color: #444; margin-top: 18px; text-align: left; }
-          .weights-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          .weights-table td { padding: 2px 8px; font-size: 1.13rem; }
-          .weights-table .label { font-weight: bold; }
-          .weights-table .val { font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="slip-container">
-          <div class="header-row">
-            <div class="header-title">Minera Steel & Power Pvt Ltd.</div>
-            <img class="logo-img" src="/Minera_Logo.jpg" alt="minera logo" />
-          </div>
-          <div class="ticket-title">TICKET</div>
-          <div class="meta-row">
-            <div>Print Date: <b>${data.printDate || ''}</b></div>
-            <div>Time: <b>${data.printTime || ''}</b></div>
-            <div>Gate Entry No.: <b>${data.GateEntryNumber || data.gateEntryNo || ''}</b></div>
-          </div>
-          <div class="divider"></div>
-          ${renderAllFieldsTable(data)}
-          <div class="divider"></div>
-          <table class="weights-table">
-            <tr>
-              <td class="label">Gross Weight</td><td class="val">: ${data.GrossWeight || data.grossWeight || ''} t</td>
-              <td class="label">Tare Weight</td><td class="val">: ${data.TareWeight || data.tareWeight || ''} t</td>
-              <td class="label">Net Weight</td><td class="val">: ${data.NetWeight || data.netWeight || ''} t</td>
-            </tr>
-          </table>
-          <div class="note">Note: This truck/vehicle weighment transaction includes the driver’s weight</div>
-        </div>
-        <script>window.onload = function() { window.print(); };</script>
-      </body>
-    </html>
-  `;
-
-  // Download & Print handler
-  const handleDownloadSlip = () => {
-    if (!slipData) return;
-    // Compose all possible fields from selectedInboundRecord and header
-    const record = selectedInboundRecord || {};
-    const headerFields = header || {};
-    // Merge all fields, technical names, header takes precedence
-    const slipFields = { ...record, ...headerFields };
-    // Add print date/time
-    slipFields.printDate = new Date().toLocaleDateString();
-    slipFields.printTime = new Date().toLocaleTimeString();
-    const slipWindow = window.open('', '_blank');
-    slipWindow.document.write(generateSlipHTML(slipFields));
-    slipWindow.document.close();
   };
 
   const resetForm = () => {
@@ -1531,33 +1330,24 @@ export default function CreateHeader() {
 
 
 
-  // Calculate NetWeight automatically
+  // Calculate NetWeight as GrossWeight - TareWeight, then update BalanceQty as original - NetWeight
   useEffect(() => {
-    if (header.GrossWeight && header.TareWeight) {
-      const net = parseFloat(header.GrossWeight) - parseFloat(header.TareWeight);
+    const gross = parseFloat(header.GrossWeight);
+    const tare = parseFloat(header.TareWeight);
+    const originalBalance = originalBalanceQtyRef.current !== null ? originalBalanceQtyRef.current : parseFloat(header.BalanceQty);
+    let net = '';
+    let newBalance = originalBalance;
+    if (!isNaN(gross) && !isNaN(tare)) {
+      net = gross - tare;
       if (!isNaN(net)) {
-        setHeader(prev => {
-          // Subtract net from BalanceQty if possible
-          let newBalanceQty = prev.BalanceQty;
-          if (prev.BalanceQty !== undefined && prev.BalanceQty !== "" && !isNaN(parseFloat(prev.BalanceQty))) {
-            newBalanceQty = (parseFloat(prev.BalanceQty) - net).toFixed(3);
-          }
-          // Optionally handle BalanceQty2,3, etc. if needed
-          // Update backend with new balance
-          if (prev.WeightDocNumber) {
-            // Only update if WeightDocNumber exists (OUT transaction)
-            updateMaterialInward(prev.WeightDocNumber, { BalanceQty: newBalanceQty });
-          }
-          return {
-            ...prev,
-            NetWeight: net.toFixed(3),
-            BalanceQty: newBalanceQty
-          };
-        });
-      } else {
-        setHeader(prev => ({ ...prev, NetWeight: '' }));
+        newBalance = Math.max(0, originalBalance - net);
       }
     }
+    setHeader(prev => ({
+      ...prev,
+      NetWeight: net === '' || isNaN(net) ? '' : net.toFixed(3),
+      BalanceQty: net === '' || isNaN(net) ? prev.BalanceQty : newBalance.toFixed(3)
+    }));
   }, [header.GrossWeight, header.TareWeight]);
 
   return (
@@ -1992,42 +1782,52 @@ export default function CreateHeader() {
       </form>
 
       {result && (
-        <div className="success-message">
-          <div className="success-header">
-            <svg viewBox="0 0 24 24" width="24" height="24">
-              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>
-            <h3>Success!</h3>
+        <>
+          <div className="success-message">
+            <div className="success-header">
+              <svg viewBox="0 0 24 24" width="24" height="24">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              <h3>Success!</h3>
+            </div>
+            <div className="success-content">
+              <p><strong>{result}</strong></p>
+              {header.GateEntryNumber && (
+                <>
+                  <p>Gate Entry Number: <strong>{header.GateEntryNumber}</strong></p>
+                  <p>Weight Doc Number: <strong>{header.WeightDocNumber}</strong></p>
+                  <p>Vehicle: {header.VehicleNumber}</p>
+                  {header.GrossWeight && <p>Gross Weight: {header.GrossWeight} MT</p>}
+                </>
+              )}
+            </div>
+            <button type="button" className="btn btn-secondary" style={{marginTop:'12px'}} onClick={handlePrintSlip}>Print Weighment Slip</button>
           </div>
-          <div className="success-content">
-            <p><strong>{result}</strong></p>
-            {header.GateEntryNumber && (
-              <>
-                <p>Gate Entry Number: <strong>{header.GateEntryNumber}</strong></p>
-                <p>Weight Doc Number: <strong>{header.WeightDocNumber}</strong></p>
-                <p>Vehicle: {header.VehicleNumber}</p>
-                {header.GrossWeight && <p>Gross Weight: {header.GrossWeight} MT</p>}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Weighment Slip Modal */}
-      {showSlipModal && slipData && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.35)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 340, maxWidth: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 22, textAlign: 'center' }}>Weighment Slip Ready</h2>
-            <p style={{ textAlign: 'center', marginBottom: 18 }}>Click below to download and print the weighment slip.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button onClick={handleDownloadSlip} style={{ background: '#0b5ed7', color: '#fff', fontWeight: 700, fontSize: 17, border: 'none', borderRadius: 6, padding: '10px 0', marginBottom: 8, cursor: 'pointer' }}>Download & Print Slip</button>
-              <button onClick={() => setShowSlipModal(false)} style={{ background: '#eee', color: '#222', fontWeight: 600, fontSize: 15, border: 'none', borderRadius: 6, padding: '8px 0', cursor: 'pointer' }}>Close</button>
+          {/* Hidden printable slip template */}
+          <div id="weighment-slip-print-area" style={{display:'none'}}>
+            <div style={{fontFamily:'monospace', padding:'24px', maxWidth:'480px', margin:'0 auto'}}>
+              <h2 style={{textAlign:'center', marginBottom:'16px'}}>Weighment Slip</h2>
+              <table style={{width:'100%', fontSize:'1.1em', marginBottom:'12px'}}>
+                <tbody>
+                  <tr><td>Gate Entry No</td><td>{header.GateEntryNumber}</td></tr>
+                  <tr><td>Weight Doc No</td><td>{header.WeightDocNumber}</td></tr>
+                  <tr><td>Date</td><td>{header.GateEntryDate}</td></tr>
+                  <tr><td>Vehicle No</td><td>{header.VehicleNumber}</td></tr>
+                  <tr><td>Transporter</td><td>{header.TransporterName}</td></tr>
+                  <tr><td>Driver</td><td>{header.DriverName}</td></tr>
+                  <tr><td>PO Number</td><td>{header.PurchaseOrderNumber}</td></tr>
+                  <tr><td>Material</td><td>{header.MaterialDescription}</td></tr>
+                  <tr><td>Gross Weight (MT)</td><td>{header.GrossWeight}</td></tr>
+                  <tr><td>Tare Weight (MT)</td><td>{header.TareWeight}</td></tr>
+                  <tr><td>Net Weight (MT)</td><td>{header.NetWeight}</td></tr>
+                  <tr><td>Balance Qty (MT)</td><td>{header.BalanceQty}</td></tr>
+                  <tr><td>Remarks</td><td>{header.Remarks}</td></tr>
+                </tbody>
+              </table>
+              <div style={{textAlign:'center', marginTop:'24px', fontSize:'0.95em'}}>--- End of Slip ---</div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
