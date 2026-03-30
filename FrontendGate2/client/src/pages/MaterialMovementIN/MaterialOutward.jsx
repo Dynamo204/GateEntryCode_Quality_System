@@ -240,7 +240,7 @@ function formatSapODataDate(dateStr) {
 
       const apiPayload = {
         gateEntryobd: { GateEntryNumber: form.GateEntryNumber }, // <-- pass the number here
-        weightDocument: {
+        WeightDocument: {
           FiscalYear: form.FiscalYear,
           Indicators: "O",
           GateEntryNumber: form.GateEntryNumber,
@@ -261,12 +261,12 @@ function formatSapODataDate(dateStr) {
       const resp = await createOBDandMaterialOutwardCreate(apiPayload);
       if (resp?.data?.success) {
         const outboundDeliveryNumber = resp.data.outboundDeliveryNumber || '';
-        const weightDocNumber = resp.data.weightDocNumber || '';
+        const WeightDocNumber = resp.data.WeightDocNumber || '';
         const gateEntryNumber = resp.data.gateEntryNumber || '';
 
         // Update OutboundDelivery and all SD fields in material document (weight doc)
-        if (weightDocNumber && outboundDeliveryNumber) {
-          await updateobdMaterialOutward(weightDocNumber, {
+        if (WeightDocNumber && outboundDeliveryNumber) {
+          await updateobdMaterialOutward(WeightDocNumber, {
             OutboundDelivery: outboundDeliveryNumber,
             TareWeight: form.TareWeight,
             TruckCapacity: form.TruckCapacity,
@@ -279,7 +279,7 @@ function formatSapODataDate(dateStr) {
           });
         }
 
-        setResult(`Material Outward and Outbound Delivery created successfully! Weight Document Number: ${weightDocNumber} | Gate Entry Number: ${gateEntryNumber} | Outbound Delivery: ${outboundDeliveryNumber}`);
+        setResult(`Material Outward and Outbound Delivery created successfully! Weight Document Number: ${WeightDocNumber} | Gate Entry Number: ${gateEntryNumber} | Outbound Delivery: ${outboundDeliveryNumber}`);
       } else {
         const msg = resp?.data?.error || 'Failed to create Outbound Delivery and Material Outward.';
         setError(msg);

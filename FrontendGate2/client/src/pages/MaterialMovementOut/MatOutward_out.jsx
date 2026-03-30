@@ -335,6 +335,7 @@ export default function MaterialOutwardTareCapture() {
         GrossWeight: payload.GrossWeight,
         TareWeight: payload.TareWeight,
         NetWeight: payload.NetWeight,
+        OutwardTime: formatSapTime(payload.OutwardTime || new Date().toISOString().slice(11, 19)),
       });
 
       setResult('Tare Weight captured successfully! Net Weight calculated.');
@@ -518,6 +519,7 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
     YY1_WeighbridgeTime_DLH: formatSapTime(form.OutwardTime),
     YY1_PGIDate_DLH: formatSapODataDate(form.GateEntryDate),
     YY1_PGITime_DLH: formatSapTime(form.OutwardTime),
+    YY1_LRDate_DLH: formatSapODataDate(form.GateEntryDate),
    // YY1_WeighbridgeTime_DLH: new Date().toISOString().slice(11, 19)
   }
 });

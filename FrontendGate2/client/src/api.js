@@ -1,27 +1,4 @@
-// Fetch Stores & Consumable line items by parentUUID (SAP_UUID)
-export function fetchScLineItems(parentUUID) {
-  return api.get(`/gateentry/items?parentUUID=${parentUUID}`);
-}
 
-// Fetch RGP line items by header UUID (SAP_PARENT_UUID)
-export function fetchRgpLineItems(uuid) {
-  return api.get(`/rgpprocess/${uuid}/items`);
-}
-
-// Fetch NRGP line items by header UUID (SAP_PARENT_UUID)
-// Duplicate declaration removed
-
-// Update NRGP ReturnableQty for line items
-export function updateNrgpReturnableQty(gateEntryNumber, items) {
-  return api.patch(`/nrgpprocess/update-returnableqty/${gateEntryNumber}`, { items });
-}
-// Fetch vendor details by code or name
-export function fetchVendorDetails({ code, name }) {
-  const params = new URLSearchParams();
-  if (code) params.set('code', code);
-  if (name) params.set('name', name);
-  return api.get(`/rgpprocess/vendors?${params.toString()}`);
-}
 import axios from 'axios';
 //export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
 export const API_BASE = 'http://localhost:4600/api';
@@ -421,5 +398,30 @@ export function saveRgpGateOut({ header, items }) {
       OutwardTime: header.OutwardTime,
       items: cleanItems,
     });
+}
+
+// Fetch Stores & Consumable line items by parentUUID (SAP_UUID)
+export function fetchScLineItems(parentUUID) {
+  return api.get(`/gateentry/items?parentUUID=${parentUUID}`);
+}
+
+// Fetch RGP line items by header UUID (SAP_PARENT_UUID)
+export function fetchRgpLineItems(uuid) {
+  return api.get(`/rgpprocess/${uuid}/items`);
+}
+
+// Fetch NRGP line items by header UUID (SAP_PARENT_UUID)
+// Duplicate declaration removed
+
+// Update NRGP ReturnableQty for line items
+export function updateNrgpReturnableQty(gateEntryNumber, items) {
+  return api.patch(`/nrgpprocess/update-returnableqty/${gateEntryNumber}`, { items });
+}
+// Fetch vendor details by code or name
+export function fetchVendorDetails({ code, name }) {
+  const params = new URLSearchParams();
+  if (code) params.set('code', code);
+  if (name) params.set('name', name);
+  return api.get(`/rgpprocess/vendors?${params.toString()}`);
 }
 export default api;
