@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api, { fetchGateEntryByNumber, ITPPDFGenerate } from "../../api";
+import api, { fetchGateEntryByNumber } from "../../api";
 //import "./GateOutHome.css";
 
 export default function GateEntryOutwardSD() {
@@ -162,6 +162,8 @@ export default function GateEntryOutwardSD() {
   const [grossWeight, setGrossWeight] = useState("");
   const [tareWeight, setTareWeight] = useState("");
   const [netWeight, setNetWeight] = useState("");
+  const [weightLoading, setWeightLoading] = useState(false);
+  // Manual entry for weights removed; always use auto/port/QR fetch
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -174,8 +176,34 @@ export default function GateEntryOutwardSD() {
   useEffect(() => {
     const gross = parseFloat(grossWeight) || 0;
     const tare = parseFloat(tareWeight) || 0;
-    setNetWeight(gross && tare ? (gross - tare).toFixed(3) : "");
+    // Net weight should be gross - tare, even if one is zero
+    if (grossWeight !== "" && tareWeight !== "") {
+      setNetWeight((gross - tare).toFixed(3));
+    } else {
+      setNetWeight("");
+    }
   }, [grossWeight, tareWeight]);
+
+  // Fetch weight from port/QR scanner (same as QRScannerout)
+  const fetchWeightFromBridge = async (type) => {
+    setWeightLoading(true);
+    try {
+      const { fetchPelletInWeightFromBridge } = await import("../../api");
+      const response = await fetchPelletInWeightFromBridge();
+      const payload = response?.data;
+      const rawWeight = payload?.data?.weight;
+      const cleaned = String(rawWeight || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+      const numberMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
+      const parsedWeight = numberMatch ? numberMatch[0] : '';
+      if (!parsedWeight) throw new Error('Unable to parse weight from weighbridge response');
+      if (type === 'gross') setGrossWeight(parsedWeight);
+      if (type === 'tare') setTareWeight(parsedWeight);
+    } catch (err) {
+      setError(err?.message || 'Failed to get weight');
+    } finally {
+      setWeightLoading(false);
+    }
+  };
 
   const handleLoad = async (e) => {
     e?.preventDefault?.();
@@ -203,8 +231,8 @@ export default function GateEntryOutwardSD() {
       }
       setGuid(g);
       const hydrated = hydrateFromSap(rec);
-      // Prefill outward time if not existing
-      if (!hydrated.OutwardTime) hydrated.OutwardTime = hhmmssNow();
+      // Always set outward time to system time (auto) on load
+      hydrated.OutwardTime = hhmmssNow();
       setData(hydrated);
       // If SAP has weights, prefill them
       setGrossWeight(rec.GrossWeight || "");
@@ -221,29 +249,8 @@ export default function GateEntryOutwardSD() {
     }
   };
 
-  const handleSetOutwardNow = () => {
-    setData((prev) => ({ ...prev, OutwardTime: hhmmssNow() }));
-  };
 
-  const downloadPdf = async (uuid, payload = {}) => {
-    try {
-      const response = await ITPPDFGenerate(uuid, payload);
-      // If using axios, response.data is a Blob only if you set responseType
-      // So, update your API function to:
-      // return api.post(`/headers/${id}/pdf`, payload, { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Truck Internal Transfer Posting.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert('Failed to download PDF');
-    }
-  };
+
 
   const handleSaveOutward = async () => {
     setError(null);
@@ -252,23 +259,32 @@ export default function GateEntryOutwardSD() {
       setError("Load an entry first.");
       return;
     }
-    // Normalize
-    if (data.OutwardTime?.startsWith("PT")) {
-      setData((prev) => ({ ...prev, OutwardTime: sapDurationToHHMMSS(prev.OutwardTime) }));
-    }
 
     setSaving(true);
     try {
+      // Always use current date for GateOutDate
+      const todayISO = new Date().toISOString().split("T")[0];
+      // NetWeight as number (not string)
+      const gross = parseFloat(grossWeight) || 0;
+      const tare = parseFloat(tareWeight) || 0;
+      const net = gross - tare;
+      // Always send OutwardTime in SAP duration format
+      let outwardTimeValue = data.OutwardTime || hhmmssNow();
+      if (!/^PT\d{1,2}H\d{1,2}M\d{1,2}S$/.test(outwardTimeValue)) {
+        outwardTimeValue = hhmmssToSapDuration(outwardTimeValue);
+      }
       const payload = {
-        OutwardTime: hhmmssToSapDuration(data.OutwardTime || hhmmssNow()),
+        OutwardTime: outwardTimeValue,
         GrossWeight: grossWeight,
         TareWeight: tareWeight,
-        NetWeight: netWeight,
+        NetWeight: net.toFixed(3),
+        GateOutDate: todayISO,
+        VehicleStatus: "OUT",
       };
       const resp = await api.patch(`/headers/${guid}`, payload);
       if (resp.status >= 200 && resp.status < 300) {
         setResult("Departure time and weights saved.");
-        downloadPdf(guid);
+        // No print slip/download here
       } else {
         setError(`Unexpected status ${resp.status}`);
       }
@@ -325,55 +341,20 @@ export default function GateEntryOutwardSD() {
         <div className="grid-3-cols">
           <div className="form-group">
             <label className="form-label">Internal Transfer Posting Entry</label>
-            <input className="form-input" value={data.GateEntryNumber} readOnly />
+            <input className="form-input" value={data.GateEntryNumber} readOnly style={{ background: '#f0f0f0' }} />
           </div>
           {/* <div className="form-group">
             <label className="form-label">Date</label>
-            <input className="form-input" type="date" value={data.GateEntryDate} readOnly />
+            <input className="form-input" type="date" value={data.GateEntryDate} readOnly style={{ background: '#f0f0f0' }} />
           </div> */}
           <div className="form-group">
             <label className="form-label">Truck Number</label>
-            <input className="form-input" value={data.VehicleNumber} readOnly />
+            <input className="form-input" value={data.VehicleNumber} readOnly style={{ background: '#f0f0f0' }} />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Outward Time</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input className="form-input" value={data.OutwardTime} readOnly />
-              <button type="button" className="btn btn-secondary" onClick={handleSetOutwardNow}>
-                Set Now
-              </button>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Gross Weight</label>
-            <input
-              className="form-input"
-              type="number"
-              value={grossWeight}
-              onChange={e => setGrossWeight(e.target.value)}
-              placeholder="Gross Weight"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Tare Weight</label>
-            <input
-              className="form-input"
-              type="number"
-              value={tareWeight}
-              onChange={e => setTareWeight(e.target.value)}
-              placeholder="Tare Weight"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Net Weight</label>
-            <input
-              className="form-input"
-              type="number"
-              value={netWeight}
-              readOnly
-              placeholder="Net Weight"
-            />
+            <label className="form-label">Outward Time (auto)</label>
+            <input className="form-input" value={data.OutwardTime} readOnly style={{ background: '#f0f0f0' }} />
           </div>
         </div>
       </section>
@@ -440,8 +421,60 @@ export default function GateEntryOutwardSD() {
         })()}
       </section>
 
-      {/* Action */}
-      <div className="form-actions">
+      {/* Action and Weights */}
+      <div className="form-actions" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Gross Weight */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <label className="form-label required" style={{ marginBottom: 0 }}>Gross Weight</label>
+          <input
+            className="form-input"
+            name="GrossWeight"
+            value={grossWeight}
+            readOnly
+            style={{ backgroundColor: '#f0f0f0', width: 100 }}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => fetchWeightFromBridge('gross')}
+            disabled={weightLoading || saving}
+            style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
+          >
+            {weightLoading ? 'Getting...' : 'Get Gross'}
+          </button>
+        </div>
+        {/* Tare Weight */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <label className="form-label required" style={{ marginBottom: 0 }}>Tare Weight</label>
+          <input
+            className="form-input"
+            name="TareWeight"
+            value={tareWeight}
+            readOnly
+            style={{ backgroundColor: '#f0f0f0', width: 100 }}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => fetchWeightFromBridge('tare')}
+            disabled={weightLoading || saving}
+            style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
+          >
+            {weightLoading ? 'Getting...' : 'Get Tare'}
+          </button>
+        </div>
+        {/* Net Weight */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <label className="form-label" style={{ marginBottom: 0 }}>Net Weight</label>
+          <input
+            className="form-input"
+            name="NetWeight"
+            value={netWeight}
+            readOnly
+            style={{ backgroundColor: '#f0f0f0', width: 100 }}
+          />
+        </div>
+        {/* Save Button */}
         <button
           type="button"
           onClick={handleSaveOutward}

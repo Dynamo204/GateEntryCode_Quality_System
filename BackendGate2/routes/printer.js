@@ -5,6 +5,18 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
+
+const API_KEY = process.env.PRINTER_API_KEY || "your-strong-secret-key";
+
+// Middleware to check API key
+function requireApiKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (key !== API_KEY) {
+    return res.status(403).json({ status: "ERROR", message: "Forbidden: Invalid API key" });
+  }
+  next();
+}
+
 const router = express.Router();
 
 // =======================================================
@@ -271,7 +283,7 @@ router.get("/api/printer/health", async (req, res) => {
 });
 
 // POST /api/printer/print — print PDF (base64) or plain text
-router.post("/api/printer/print", async (req, res) => {
+router.post("/api/printer/print", requireApiKey, async (req, res) => {
   const requestId = Date.now();
   
   try {
@@ -385,7 +397,7 @@ router.post("/api/printer/print", async (req, res) => {
 });
 
 // POST /api/printer/test-text — direct plain text printer test
-router.post("/api/printer/test-text", async (req, res) => {
+router.post("/api/printer/test-text", requireApiKey, async (req, res) => {
   const requestId = Date.now();
   
   try {
