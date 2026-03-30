@@ -1,3 +1,7 @@
+// Internal Transfer Posting creation
+export function createInternalTransferPosting(payload) {
+  return api.post('/internal-transfer-posting', payload);
+}
 // Fetch Stores & Consumable line items by parentUUID (SAP_UUID)
 export function fetchScLineItems(parentUUID) {
   return api.get(`/gateentry/items?parentUUID=${parentUUID}`);
