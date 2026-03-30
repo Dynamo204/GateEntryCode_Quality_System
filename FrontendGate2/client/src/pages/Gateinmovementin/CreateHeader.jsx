@@ -417,7 +417,7 @@ export default function CreateHeader() {
     // Fetch pricing element for selected PO
     const poNumber = poItemsModal.poNumber;
     if (poNumber) {
-      axios.get(`https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`, {
+      axios.get(`http://localhost:4600/api/po/pricing?poNumber=${poNumber}`, {
         headers: {
           "Accept": "application/json",
         },
