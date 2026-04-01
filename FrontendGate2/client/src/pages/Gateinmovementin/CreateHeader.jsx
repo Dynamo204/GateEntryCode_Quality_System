@@ -417,7 +417,8 @@ export default function CreateHeader() {
     // Fetch pricing element for selected PO
     const poNumber = poItemsModal.poNumber;
     if (poNumber) {
-      axios.get(`http://localhost:4600/api/po/pricing?poNumber=${poNumber}`, {
+    //  axios.get(`http://localhost:4600/api/po/pricing?poNumber=${poNumber}`, {
+      axios.get(`https://gateentry.cfapps.in30.hana.ondemand.com/api/po/pricing?poNumber=${poNumber}`, {
         headers: {
           "Accept": "application/json",
         },

@@ -1,5 +1,7 @@
 applications:
-  - name: GateEntry-frontend
+  #- name: GateEntry-frontend
+  #- name: GateEntry-frontend-QLT
+  - name: GateEntry-Frontend-Production
     path: ./dist
     memory: 64M
     buildpacks:

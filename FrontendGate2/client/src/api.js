@@ -1,8 +1,10 @@
 
 import axios from 'axios';
 //export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
-export const API_BASE = 'http://localhost:4600/api';
-//export const API_BASE = 'https://gateentry-backend-latest.onrender.com/api';
+//export const API_BASE = 'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api';
+export const API_BASE = 'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api';
+//export const API_BASE = 'http://localhost:4600/api';
+
 const API_TIMEOUT_MS = 120000;
 
 const api = axios.create({
@@ -103,6 +105,14 @@ export const fetchGateEntryByNumber = (gateEntryNumberOrFilter) => {
   return api.get(`/headers?${filter}`);
 };
 
+export const fetchGateWeighmentDetails = (gateEntryNumber) => {
+  return api.get(`/weightdetails?gateEntryNumber=${encodeURIComponent(gateEntryNumber)}`);
+};
+
+export const fetchpurchaseOrderQTY = (poNumber) => {
+  return api.get(`/api/headers/QRWeightment1/${poNumber}`);
+}
+
 // RGP-specific fetch by gate entry number (for RGP Gate Out)
 // Duplicate removed: fetchRgpGateEntryByNumber
 
@@ -132,10 +142,13 @@ export function updateMaterialInward(uuid, payload) {
   return api.patch(`/headers/material/${uuid}`, cleanPayload);
 }
 
-export const fetchPelletInWeightFromBridge = () => api.get('/pellet-in-weight');
-export const fetchTareWeightFromBridge = () => api.get('/pallet-out-weight');
+
 export const fetchGateInWaymentFromBridge = () => api.get('/gate-in-wayment');
 export const fetchGateOutWaymentFromBridge = () => api.get('/gate-out-wayment');
+
+
+export const fetchPelletInWeightFromBridge = () => api.get('/pellet-in-weight');
+export const fetchTareWeightFromBridge = () => api.get('/pellet-out-weight');
 
 export function updateobdMaterialOutward(uuid, payload) {
   // Clean UI-only fields

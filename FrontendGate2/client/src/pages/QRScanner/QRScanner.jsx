@@ -312,7 +312,7 @@ export default function CreateHeader() {
     };
   }, [header.VendorInvoiceNumber]);
 
-  // Debounced PO lookup for Division to prevent calls on each keystroke.
+  // Debounced PO lookup for Division and fetch latest valid Gate Entry BalanceQty for PO
   useEffect(() => {
     const poNumber = String(header.PurchaseOrderNumber || '').trim();
     if (poNumber.length < 5) {
@@ -328,6 +328,7 @@ export default function CreateHeader() {
     poLookupTimeoutRef.current = setTimeout(async () => {
       if (cancelled) return;
       try {
+        // 1. Fetch PO details for approval and material info
         const resp = await fetchPurchaseOrderByNumber(poNumber);
 
         if (!isPurchaseOrderApproved(resp?.data)) {
@@ -387,21 +388,80 @@ export default function CreateHeader() {
           resp?.data?.["d:MaterialDescription"] ||
           '';
 
-        if (!cancelled && (plant || poMaterial || poMaterialDescription)) {
+        // 2. Fetch all Gate Entries for this PO from OData (backend API)
+        // Use OData $filter for PurchaseOrderNumber eq 'poNumber'
+        // The backend route is /headers?filter=...
+        // Use fetchGateEntryByNumber with a custom filter
+        const safePo = escapeODataValue(poNumber);
+        const filter = `$filter=PurchaseOrderNumber eq '${safePo}'&$format=json`;
+        const gateResp = await fetchGateEntryByNumber(filter);
+        const gateResults = gateResp?.data?.d?.results || gateResp?.data?.value || [];
+
+        // 3. Sort by GateEntryDate desc, InwardTime desc
+        const parseDate = (d) => {
+          if (!d) return 0;
+          if (typeof d === 'string' && d.length >= 10) return new Date(d).getTime();
+          return 0;
+        };
+        const parseTime = (t) => {
+          if (!t) return 0;
+          // SAP duration: PT16H40M06S or HH:MM:SS
+          if (typeof t === 'string' && t.startsWith('PT')) {
+            const m = t.match(/PT(\d+)H(\d+)M(\d+)S/);
+            if (m) return Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]);
+          }
+          if (typeof t === 'string' && t.match(/^\d{2}:\d{2}:\d{2}$/)) {
+            const [h,m,s] = t.split(':').map(Number); return h*3600+m*60+s;
+          }
+          return 0;
+        };
+        const sorted = [...gateResults].sort((a, b) => {
+          const dateA = parseDate(a.GateEntryDate || a["d:GateEntryDate"]);
+          const dateB = parseDate(b.GateEntryDate || b["d:GateEntryDate"]);
+          if (dateA !== dateB) return dateB - dateA;
+          const timeA = parseTime(a.InwardTime || a["d:InwardTime"]);
+          const timeB = parseTime(b.InwardTime || b["d:InwardTime"]);
+          return timeB - timeA;
+        });
+
+        // 4. Find latest valid (Status is Success or null/empty, not CANCELLED)
+        const normalizeStatus = (v) => String(v || '').trim().toUpperCase();
+        let latestValid = null;
+        for (const entry of sorted) {
+          const status = normalizeStatus(entry.Status || entry["d:Status"]);
+          if (status === 'CANCELLED') continue;
+          if (status === 'SUCCESS' || status === '' || status === 'NULL' || status === null) {
+            latestValid = entry;
+            break;
+          }
+        }
+
+        // 5. Get BalanceQty from latest valid entry
+        let balanceQty = '';
+        if (latestValid) {
+          balanceQty = latestValid.BalanceQty || latestValid["d:BalanceQty"] || '';
+        } else {
+          // Fallback: use PO quantity if available
+          balanceQty = firstItem.OrderQuantity || firstItem.Quantity || firstItem.BalanceQty || '';
+        }
+
+        // 6. Update header state with all info
+        if (!cancelled) {
           setHeader(prev => {
             if (prev.PurchaseOrderNumber !== poNumber) return prev;
-
             return {
               ...prev,
               Division: plant || prev.Division,
               Material: poMaterial || prev.Material,
               MaterialDescription: poMaterialDescription || prev.MaterialDescription,
+              BalanceQty: balanceQty || '',
+              BalanceQty3: (firstItem.OrderQuantity || firstItem.Quantity || prev.BalanceQty3 || '')
             };
           });
         }
       } catch (err) {
         if (err?.response?.status !== 404) {
-          console.warn('Unable to fetch plant for PO', poNumber, err);
+          console.warn('Unable to fetch PO or GateEntry for PO', poNumber, err);
         }
       }
     }, 300);
@@ -772,8 +832,38 @@ export default function CreateHeader() {
   // Auto-parse remarks and map fields if remarks is pipe-delimited and not already mapped
   useEffect(() => {
     if (header.Remarks && (header.Remarks.match(/\|/g) || []).length >= 4) {
-      // Always call handleQRRemarks to set all fields, including BalanceQty
-      handleQRRemarks(header.Remarks);
+      const fields = parseQRRemarks(header.Remarks);
+      const parsedVehicle = String(fields.TruckNumber || '').trim();
+      const currentVehicle = String(header.VehicleNumber || '').trim();
+      const parsedInvoice = String(fields.VendorInvoiceNumber || '').trim();
+      const currentInvoice = String(header.VendorInvoiceNumber || '').trim();
+
+      // Update when parsed value is brand new OR a fuller continuation of current partial value.
+      const shouldUpdateVehicle = Boolean(parsedVehicle) && (
+        !currentVehicle || parsedVehicle === currentVehicle || parsedVehicle.startsWith(currentVehicle)
+      );
+      const shouldUpdateInvoice = Boolean(parsedInvoice) && (
+        !currentInvoice || parsedInvoice === currentInvoice || parsedInvoice.startsWith(currentInvoice)
+      );
+
+      if (
+        shouldUpdateInvoice ||
+        shouldUpdateVehicle
+      ) {
+        setHeader(prev => ({
+          ...prev,
+          PermitNumber: fields.PermitNumber || prev.PermitNumber,
+          LRGCNumber: fields.PermitNumber || fields.mteNumber || prev.LRGCNumber,
+          VendorInvoiceDate: fields.VendorInvoiceDate || prev.VendorInvoiceDate,
+          VendorInvoiceNumber: shouldUpdateInvoice ? parsedInvoice : prev.VendorInvoiceNumber,
+          VendorInvoiceWeight: fields.VendorInvoiceWeight || prev.VendorInvoiceWeight,
+          // GrossWeight should be entered manually in inward screen.
+          GrossWeight: prev.GrossWeight,
+          VehicleNumber: shouldUpdateVehicle ? parsedVehicle : prev.VehicleNumber,
+          Division: fields.location || prev.Division,
+          // Remarks: prev.Remarks // don't overwrite
+        }));
+      }
     }
   }, [header.Remarks]);
 
@@ -1178,9 +1268,10 @@ export default function CreateHeader() {
                 className="form-input"
                 name="GrossWeight"
                 value={header.GrossWeight}
-                readOnly
-                placeholder="0"
-                style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+                onChange={handleChange}
+                placeholder="Enter or Get Gross"
+                style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
+                inputMode="decimal"
               />
               <button
                 type="button"
@@ -1191,6 +1282,9 @@ export default function CreateHeader() {
               >
                 {grossWeightLoading ? 'Getting...' : 'Get Gross'}
               </button>
+              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
+                (You can enter manually or use Get Gross)
+              </span>
             </div>
           </div>
           <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`}>

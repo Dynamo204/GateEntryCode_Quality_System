@@ -18,10 +18,10 @@ const createInitialState = () => {
   
   return {
     WeightDocNumber: '',
-    FiscalYear: new Date().getFullYear().toString(),
+    FiscalYear: '',
     Indicators: 'I',
     GateEntryNumber: '',
-    GateFiscalYear: new Date().getFullYear().toString(),
+    GateFiscalYear: '',
     GateIndicators: 'I',
     
     // Initialize ALL PO fields to prevent uncontrolled -> controlled warning
@@ -301,14 +301,10 @@ export default function MaterialInward() {
     setLoading(true);
     try {
       let payload = { ...form };
-      // Only generate WeightDocNumber on Save
-      if (!form.WeightDocNumber) {
-        const year = new Date().getFullYear().toString();
-        const resp = await fetchNextWeightDocNumber(year, 4); // code=4 for 251 series (Inward)
-        const nextNumber = resp?.data?.next || resp?.data?.value || resp?.data || '';
-        setForm(prev => ({ ...prev, WeightDocNumber: String(nextNumber || '') }));
-        payload.WeightDocNumber = String(nextNumber || '');
-      }
+      // Always let backend generate WeightDocNumber, do not set it here
+      delete payload.WeightDocNumber;
+      // Pass code for backend series (4 = Inward)
+     // payload.code = 4;
 
       // Convert date fields to SAP datetime format (YYYY-MM-DDTHH:mm:ss)
       if (payload.GateEntryDate && payload.GateEntryDate.length === 10) {
@@ -322,7 +318,6 @@ export default function MaterialInward() {
       for (let i = 1; i <= 5; i++) {
         const suffix = i === 1 ? '' : String(i);
         const dateField = `VendorInvoiceDate${suffix}`;
-        
         if (payload[dateField]) {
           // If it's a date string (YYYY-MM-DD), convert to datetime
           if (payload[dateField].length === 10) {
@@ -467,7 +462,7 @@ export default function MaterialInward() {
           GateEntryDate: parsedDate || prev.GateEntryDate,
           TruckNumber: gateEntry.VehicleNumber || gateEntry.TruckNumber || gateEntry.VehicleNo || '',
           TransporterCode: gateEntry.TransporterCode || gateEntry.TransporterName || '',
-          GateFiscalYear: gateEntry.FiscalYear || prev.GateFiscalYear,
+          GateFiscalYear: '',
           LRGCNumber: gateEntry.LRGCNumber || '',
           PermitNumber: gateEntry.PermitNumber || '',
           SubTransporterName: gateEntry.SubTransporterName || '',
@@ -610,7 +605,7 @@ export default function MaterialInward() {
                 value={form.FiscalYear}
                 onChange={handleChange}
                 className="form-input"
-                required
+                
               />
             </div>
 

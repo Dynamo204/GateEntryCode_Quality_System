@@ -1,4 +1,4 @@
-  // Print weighment slip
+ // Print weighment slip
   const handlePrintSlip = () => {
     const printContents = document.getElementById('weighment-slip-print-area').innerHTML;
     const originalContents = document.body.innerHTML;
@@ -1733,9 +1733,10 @@ export default function CreateHeader() {
                 className="form-input"
                 name="TareWeight"
                 value={header.TareWeight}
-                readOnly
-                placeholder="0.00"
-                style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+                onChange={handleChange}
+                placeholder="Enter or Get Tare"
+                style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
+                inputMode="decimal"
               />
               <button
                 type="button"
@@ -1746,6 +1747,9 @@ export default function CreateHeader() {
               >
                 {tareWeightLoading ? 'Getting...' : 'Get Tare'}
               </button>
+              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
+                (You can enter manually or use Get Tare)
+              </span>
             </div>
           </div>
 
@@ -1755,10 +1759,14 @@ export default function CreateHeader() {
               className="form-input"
               name="GrossWeight"
               value={header.GrossWeight}
-              readOnly
-              placeholder="0"
-              style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
+              onChange={handleChange}
+              placeholder="Enter or Get Gross"
+              style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
+              inputMode="decimal"
             />
+            <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
+              (You can enter manually or use Get Gross)
+            </span>
           </div>
 
           <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
