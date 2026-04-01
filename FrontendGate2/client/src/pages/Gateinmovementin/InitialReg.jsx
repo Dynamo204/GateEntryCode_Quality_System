@@ -106,9 +106,8 @@ export default function InitialRegistration() {
         // Filter on frontend for strictness
         console.log('Raw transporter suggestions:', suggestions);
         const filtered = suggestions.filter(t =>
-          (t.TransporterName || '').toLowerCase().includes(val) ||
-          (t.TransporterCode || '').toLowerCase().includes(val) ||
-          (t.Transporter || '').toLowerCase().includes(val)
+        (t.TransporterName || '').toLowerCase().includes(val) ||
+        (t.TransporterCode || '').toLowerCase().includes(val)
         );
         // Deduplicate by name+code
         const unique = [];
@@ -269,6 +268,7 @@ export default function InitialRegistration() {
         SalesDocument2: formData.SalesDocument2 || "",
         VehicleNumber: formData.VehicleNumber || "",
         Transporter: formData.Transporter || "",
+        TransporterCode: formData.TransporterCode || "",
         SAP_Description: formData.SAP_Description || "",
         Status: "01",
         // Try sending as string with 2 decimal places first (most common SAP requirement)

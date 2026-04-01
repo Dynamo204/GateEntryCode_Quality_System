@@ -1,5 +1,7 @@
 applications:
-  - name: GateEntry
+  # - name: GateEntry
+  #- name: GateEntry-QLT
+  - name: GateEntry-Production-Server
     path: ./
     memory: 256M
     buildpacks:

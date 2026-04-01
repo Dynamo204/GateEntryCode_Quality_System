@@ -598,7 +598,7 @@ export default function Outward() {
               onChange={handleChange}
               placeholder="Tare Weight"
               required
-              readOnly
+              
               style={{ backgroundColor: '#f0f0f0', width: 100 }}
             />
             <button

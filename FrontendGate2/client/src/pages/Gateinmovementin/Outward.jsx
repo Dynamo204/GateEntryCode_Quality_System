@@ -194,6 +194,7 @@ function getCustomerNameByNumber(customers, customerNumber) {
       VehicleNumber: regData.VehicleNumber || '',
       RegistrationNumber: regData.RegistrationNumber || prev.RegistrationNumber,
       TransporterName: regData.Transporter || '',
+      TransporterCode: regData.TransporterCode || '',
       BalanceQty: regData.ExpectedQty || '',
       Remarks: regData.SAP_Description || ''
     }));

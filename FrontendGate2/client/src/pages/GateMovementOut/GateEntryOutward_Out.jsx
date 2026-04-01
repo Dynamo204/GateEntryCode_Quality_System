@@ -328,9 +328,9 @@ export default function GateEntryOutwardSD() {
     const currentDate = new Date().toISOString().split("T")[0];
     try {
       const payload = {
-        OutwardTime: hhmmssToSapDuration(data.OutwardTime || hhmmssNow()),
-        VehicleStatus: "OUT",
-        GateOutDate: currentDate
+        OutwardTime: "",
+        VehicleStatus: "",
+        GateOutDate: ""
       };
       // PATCH using GateEntryNumber
       const resp = await api.patch(`/headers/${gateEntryNumber}`, payload);

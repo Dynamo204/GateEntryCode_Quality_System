@@ -188,8 +188,8 @@ export default function GateEntryOutwardSD() {
   const fetchWeightFromBridge = async (type) => {
     setWeightLoading(true);
     try {
-      const { fetchPelletInWeightFromBridge } = await import("../../api");
-      const response = await fetchPelletInWeightFromBridge();
+      const { fetchTareWeightFromBridge } = await import("../../api");
+      const response = await fetchTareWeightFromBridge();
       const payload = response?.data;
       const rawWeight = payload?.data?.weight;
       const cleaned = String(rawWeight || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();

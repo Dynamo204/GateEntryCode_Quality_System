@@ -16,9 +16,11 @@ const W1_HOST = "136.233.76.90";
 const W2_HOST = "136.233.76.90";
 const W3_HOST = "136.233.76.90";
 const W4_HOST = "136.233.76.90";
-const W2_CLIENT_PORT = 2122;
-const W4_CLIENT_PORT = 2123;
-const DEFAULT_CLIENT_PORT = W2_CLIENT_PORT;
+const W1_CLIENT_PORT = '';
+const W2_CLIENT_PORT = '';
+const W3_CLIENT_PORT = 2122;  //Pellent In - Gross weight
+const W4_CLIENT_PORT = 2123; //Pellent Out - Tare weight
+const DEFAULT_CLIENT_PORT = W3_CLIENT_PORT;
 
 // TCP connection timeout
 const TCP_TIMEOUT = 10000;
@@ -72,7 +74,7 @@ router.get("/api/weightbridge/healthhh", (req, res) => {
 // Pellet In: inward/gross weighbridge mapped to W3
 router.get("/api/pellet-in-weight", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W3_HOST);
+    const weightData = await readWeightFromClient(W3_HOST, W3_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({
@@ -84,7 +86,7 @@ router.get("/api/pellet-in-weight", async (req, res) => {
 });
 
 // Pallet Out: outward/tare weighbridge mapped to W4
-router.get("/api/pallet-out-weight", async (req, res) => {
+router.get("/api/pellet-out-weight", async (req, res) => {
   try {
     const weightData = await readWeightFromClient(W4_HOST, W4_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
@@ -128,7 +130,7 @@ router.get("/api/gate-out-wayment", async (req, res) => {
 // Backward-compatible aliases
 router.get("/api/read-weight", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W3_HOST);
+    const weightData = await readWeightFromClient(W3_HOST, W3_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({
@@ -155,7 +157,7 @@ router.get("/api/read-tare", async (req, res) => {
 // Alias endpoint maintained for compatibility
 router.get("/weight", async (req, res) => {
   try {
-    const weightData = await readWeightFromClient(W3_HOST);
+    const weightData = await readWeightFromClient(W3_HOST, W3_CLIENT_PORT);
     res.status(200).json({ status: "SUCCESS", data: weightData });
   } catch (error) {
     res.status(500).json({

@@ -331,12 +331,22 @@ export default function MaterialOutwardTareCapture() {
       const response = await updateMaterialInward(payload.SAP_UUID, payload);
 
       // Explicitly update gate header weights too (same fields user sees in gate header feed).
-      await updateHeaderByKey(payload.GateEntryNumber, {
-        GrossWeight: payload.GrossWeight,
-        TareWeight: payload.TareWeight,
-        NetWeight: payload.NetWeight,
-        OutwardTime: formatSapTime(payload.OutwardTime || new Date().toISOString().slice(11, 19)),
-      });
+     const formatSapTime = (time) => {
+     if (!time) return null;
+
+     const [hh, mm, ss] = time.split(':');
+
+     return `PT${hh}H${mm}M${ss}S`;
+     };
+      const now = new Date();
+      const systemtime = now.toTimeString().split(" ")[0];
+
+      // await updateHeaderByKey(payload.GateEntryNumber, {
+      //   GrossWeight: payload.GrossWeight,
+      //   TareWeight: payload.TareWeight,
+      //   NetWeight: payload.NetWeight,
+      //   OutwardTime: formatSapTime(systemtime),
+      // });
 
       setResult('Tare Weight captured successfully! Net Weight calculated.');
       // No auto print. Show print button after success.
@@ -507,6 +517,9 @@ function formatSapTime(timeStr) {
   const [hh, mm, ss] = timeStr.split(":");
   return `PT${hh}H${mm}M${ss}S`;
 }
+const now = new Date();
+const systemtime = now.toTimeString().split(" ")[0];
+const systemdate = new Date().toISOString().split("T")[0];
     // 1) Update Outbound Delivery item with Net Weight
 await updateOutboundDelivery(deliveryDoc, itemNumber, {
   item: {
@@ -516,9 +529,9 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
     YY1_GrossWeight_DLH: form.GrossWeight,
     YY1_WeighbridgeNo_DLH: form.WeightDocNumber,
     YY1_WeighbridgeDate_DLH: formatSapODataDate(form.GateEntryDate),
-    YY1_WeighbridgeTime_DLH: formatSapTime(form.OutwardTime),
+    YY1_WeighbridgeTime_DLH: formatSapTime(systemtime),
     YY1_PGIDate_DLH: formatSapODataDate(form.GateEntryDate),
-    YY1_PGITime_DLH: formatSapTime(form.OutwardTime),
+    YY1_PGITime_DLH: formatSapTime(systemtime),
     YY1_LRDate_DLH: formatSapODataDate(form.GateEntryDate),
    // YY1_WeighbridgeTime_DLH: new Date().toISOString().slice(11, 19)
   }
@@ -527,10 +540,11 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-       'http://localhost:4600/api/goodsissue-and-invoice-int',
-       //'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
-      // 'https://gateentry-backend-latest.onrender.com/api/goodsissue-and-invoice',
+     //  'http://localhost:4600/api/goodsissue-and-invoice-int',
+     //  'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+     //   'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
   //    'https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/goodsissue-and-invoice',
+       'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
       { DeliveryDocument: deliveryDoc },
       { responseType: 'arraybuffer', timeout: 60000 } // use arraybuffer for binary
     );
