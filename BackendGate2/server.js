@@ -37,47 +37,6 @@ app.use("/api/nrgpprocess", nrgpProcessRouter);
 //Quality Port = 430382
 //Production Port = 437207
 
-// //const SAP_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-// const SAP_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-// //const SAP_BASE_WEIGHTBRIDGE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
-// const SAP_BASE_WEIGHTBRIDGE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
-// //const SAP_BASE_InitialRegistration = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
-// const SAP_BASE_InitialRegistration = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
-// //const SAP_BASE_UserAccess = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
-// const SAP_BASE_UserAccess = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
-// //const SAP_BASE_LiveDashBoard = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS'
-// const SAP_BASE_LiveDashBoard = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
-// //const SAP_BASE_Transporter = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
-// const SAP_BASE_Transporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
-
-
-// //const SAP_BASE_PO = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
-// const SAP_BASE_PO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
-// //const SAP_BASE_GRN = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
-// const SAP_BASE_GRN = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
-// //const SAP_BASE_SO = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
-// const SAP_BASE_SO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
-// //const SAP_BASE_OBD ='https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002'
-// const SAP_BASE_OBD ='https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002';
-// //const SAP_BASE_BILLING = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
-// const SAP_BASE_BILLING = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
-// //const SAP_BASE_BILLING_PDF = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
-// const SAP_BASE_BILLING_PDF = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
-// //const SAP_BASE_PRODUCT = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
-// const SAP_BASE_PRODUCT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
-// //const SAP_BASE_CustomerMaster = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
-// const SAP_BASE_CustomerMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
-// //const SAP_BASE_SupplierMaster = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
-// const SAP_BASE_SupplierMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
-// //const SAP_BASE_SO2 = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
-// const SAP_BASE_SO2 = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
-// //const SAP_BASE_MAILIDADDRESSES = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
-// const SAP_BASE_MAILIDADDRESSES = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
-
-
-
-
-
 
 // ================= CUSTOMIZING =================
 // Uncomment this block when using CUSTOM
@@ -109,24 +68,25 @@ app.use("/api/nrgpprocess", nrgpProcessRouter);
 // ================= QUALITY =================
 // Currently IN-ACTIVE
 
-// const SAP_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-// const SAP_BASE_WEIGHTBRIDGE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
-// const SAP_BASE_InitialRegistration = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
-// const SAP_BASE_UserAccess = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
-// const SAP_BASE_LiveDashBoard = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
-// const SAP_BASE_Transporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+const SAP_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+const SAP_BASE_WEIGHTBRIDGE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
+const SAP_BASE_InitialRegistration = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
+const SAP_BASE_UserAccess = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
+const SAP_BASE_LiveDashBoard = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
+const SAP_BASE_Transporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
 
-// const SAP_BASE_PO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
-// const SAP_BASE_GRN = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
-// const SAP_BASE_SO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
-// const SAP_BASE_OBD = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002';
-// const SAP_BASE_BILLING = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
-// const SAP_BASE_BILLING_PDF = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
-// const SAP_BASE_PRODUCT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
-// const SAP_BASE_CustomerMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
-// const SAP_BASE_SupplierMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
-// const SAP_BASE_SO2 = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
-// const SAP_BASE_MAILIDADDRESSES = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
+const SAP_BASE_PO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
+const SAP_BASE_GRN = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
+const SAP_BASE_SO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
+const SAP_BASE_OBD = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002';
+const SAP_BASE_BILLING = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
+const SAP_BASE_BILLING_PDF = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
+const SAP_BASE_PRODUCT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
+const SAP_BASE_CustomerMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
+const SAP_BASE_SupplierMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
+const SAP_BASE_SO2 = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
+const SAP_BASE_MAILIDADDRESSES = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
+const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
 
 
 
@@ -135,24 +95,25 @@ app.use("/api/nrgpprocess", nrgpProcessRouter);
 // Uncomment when go-live Date : 01-04-2026
 
 
-const SAP_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-const SAP_BASE_WEIGHTBRIDGE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
-const SAP_BASE_InitialRegistration = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
-const SAP_BASE_UserAccess = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
-const SAP_BASE_LiveDashBoard = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
-const SAP_BASE_Transporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+// const SAP_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+// const SAP_BASE_WEIGHTBRIDGE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS';
+// const SAP_BASE_InitialRegistration = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_INITIALREGISTRATION_CDS';
+// const SAP_BASE_UserAccess = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
+// const SAP_BASE_LiveDashBoard = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
+// const SAP_BASE_Transporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
 
-const SAP_BASE_PO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
-const SAP_BASE_GRN = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
-const SAP_BASE_SO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
-const SAP_BASE_OBD = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002';
-const SAP_BASE_BILLING = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
-const SAP_BASE_BILLING_PDF = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
-const SAP_BASE_PRODUCT = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
-const SAP_BASE_CustomerMaster = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
-const SAP_BASE_SupplierMaster = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
-const SAP_BASE_SO2 = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
-const SAP_BASE_MAILIDADDRESSES = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
+// const SAP_BASE_PO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
+// const SAP_BASE_GRN = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
+// const SAP_BASE_SO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_SALES_ORDER_SRV';
+// const SAP_BASE_OBD = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_OUTBOUND_DELIVERY_SRV;v=0002';
+// const SAP_BASE_BILLING = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_billingdocument/srvd_a2x/sap/billingdocument/0001/';
+// const SAP_BASE_BILLING_PDF = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BILLING_DOCUMENT_SRV';
+// const SAP_BASE_PRODUCT = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_product/srvd_a2x/sap/product/0002/';
+// const SAP_BASE_CustomerMaster = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CUSTOMER_MASTER_CDS';
+// const SAP_BASE_SupplierMaster = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
+// const SAP_BASE_SO2 = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
+// const SAP_BASE_MAILIDADDRESSES = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
+// const SAP_BASE_REPRINT = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
 
 
 ///********************** SAP CONFIGURATION - UPDATE FOR EACH ENVIRONMENT **/
@@ -294,6 +255,14 @@ const sapAxiosSOdetails = axios.create({
 
 const sapAxiosMailIDAddresses = axios.create({
   baseURL: SAP_BASE_MAILIDADDRESSES,
+  auth: {
+    username: SAP_USER_ST,
+    password: SAP_PASS_ST
+  }
+});
+
+const sapAxiosReprint = axios.create({
+  baseURL: SAP_BASE_REPRINT,
   auth: {
     username: SAP_USER_ST,
     password: SAP_PASS_ST
@@ -728,6 +697,7 @@ app.get('/api/headers', async (req, res) => {
   try {
     const rawQuery = (req.originalUrl || '').split('?')[1] || '';
     const sapPath = rawQuery ? `/YY1_GATEINWARD_OUTWARDDETA?${rawQuery}` : '/YY1_GATEINWARD_OUTWARDDETA?$top=50&$format=json';
+    //const url =`https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA_CDS?$filter=GateEntryNumber eq '${gateEntryNum}'`;
     //      const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS_CDS?$filter=GateEntryNumber eq '${gateEntryNum}'`;
    // const sapPath2 = rawQuery ? `/YY1_GATEINWARD_OUTWARDDETA?${rawQuery}` : '/YY1_GATEINWARD_OUTWARDDETA?$top=50&$format=json';
     console.log('[API] forwarding to SAP ->', sapPath);
@@ -741,108 +711,174 @@ app.get('/api/headers', async (req, res) => {
 
 
 
-app.get('/api/weightdetails', async (req, res) => {
+
+app.get('/api/weightdetails/all', async (req, res) => {
   try {
-    const { gateEntryNumber } = req.query;
 
-    if (!gateEntryNumber) {
-      return res.status(400).json({
-        error: "gateEntryNumber is required"
-      });
-    }
+    const path =
+      `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$top=100&$filter=VehicleStatus eq 'OUT' &$format=json`;
+    const response = await sapAxiosReprint.get(path);
+    const results = response.data?.d?.results || [];
 
-    // 👉 Gate Entry API
-    const gatePath =
-      `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
+    const finalData = results.map(item => ({
+      GateEntryNumber: item.GateEntryNumber,
+      WeightDocNumber: item.WeightDocNumber,
+      VehicleNumber: item.VehicleNumber || "-",
+      BillingDocument: item.BillingDocument ||"-",
+      GrossWeight: item.GrossWeight || "-",
+      TareWeight: item.TareWeight || "-",
+      NetWeight: item.NetWeight || "-",
+      OutboundDelivery: item.OutboundDelivery || "-",
+      SalesDocument: item.SalesDocument || "-",
+      Customer: item.Customer || "-",
+      CustomerName: item.CustomerName || "-",
+      TransporterCode: item.TransporterCode || "-",
+      TransporterName: item.TransporterName || "-",
+      Vendor: item.Vendor || "-",
+      VendorName: item.VendorName || "-",
+      PurchaseOrderNumber: item.PurchaseOrderNumber || "-",
+      PurchaseOrderNumber2: item.PurchaseOrderNumber2 || "-",
+      PurchaseOrderNumber3: item.PurchaseOrderNumber3 || "-",
+      PurchaseOrderNumber4: item.PurchaseOrderNumber4 || "-",
+      PurchaseOrderNumber5: item.PurchaseOrderNumber5 || "-",
+      Material: item.Material || "-",
+      Material2: item.Material2|| "-",
+      Material3: item.Material3 || "-",
+      Material4: item.Material4 || "-",
+      Material5: item.Material5 || "-",
+      MaterialDescription: item.MaterialDescription || "-",
+      MaterialDescription2: item.MaterialDescription2 || "-",
+      MaterialDescription3: item.MaterialDescription3 || "-",
+      MaterialDescription4: item.MaterialDescription4 || "-",
+      MaterialDescription5: item.MaterialDescription5 || "-",
 
-    console.log('[API] Gate Entry ->', gatePath);
+      VendorInvoiceNumber: item.VendorInvoiceNumber || "-",
+      VendorInvoiceNumber2: item.VendorInvoiceNumber2 || "-",
+      VendorInvoiceNumber3: item.VendorInvoiceNumber3 || "-",
+      VendorInvoiceNumber4: item.VendorInvoiceNumber4 || "-",
+      VendorInvoiceNumber5: item.VendorInvoiceNumber5 || "-",
 
-    const gateResp = await sapAxios.get(gatePath);
-    const gateResults = gateResp.data?.d?.results || [];
+      VendorInvoiceDate: item.VendorInvoiceDate || "-",
+      VendorInvoiceDate2: item.VendorInvoiceDate2 || "-",
+      VendorInvoiceDate3: item.VendorInvoiceDate3 || "-",
+      VendorInvoiceDate4: item.VendorInvoiceDate4 || "-",
+      VendorInvoiceDate5: item.VendorInvoiceDate5 || "-",
 
-    if (!gateResults.length) {
-      return res.json({
-        gateEntry: null,
-        weighments: []
-      });
-    }
+      VendorInvoiceWeight: item.VendorInvoiceWeight || "-",
+      VendorInvoiceWeight2: item.VendorInvoiceWeight2 || "-",
+      VendorInvoiceWeight3: item.VendorInvoiceWeight3 || "-",
+      VendorInvoiceWeight4: item.VendorInvoiceWeight4 || "-",
+      VendorInvoiceWeight5: item.VendorInvoiceWeight5 || "-",
 
-    // 👉 Weighment API
-    const weightPath =
-      `/YY1_CAPTURINGWEIGHTDETAILS?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
+      BalanceQty: item.BalanceQty || "-",
+      BalanceQty2: item.BalanceQty2 || "-",
+      BalanceQty3: item.BalanceQty3 || "-",
+      BalanceQty4: item.BalanceQty4 || "-",
+      BalanceQty5: item.BalanceQty5 || "-",
 
-    console.log('[API] Weighment ->', weightPath);
+      InwardTime: item.InwardTime || "-",
+      OutwardTime: item.OutwardTime || "-",
+      GateEntryDate: item.GateEntryDate || "-",
+      GateOutDate: item.GateOutDate || "-",
+      WeighmentVehicleStatus: item.VehicleStatus || "-",
+      SAP_CreatedDateTime: item.SAP_CreatedDateTime || "-"
+    }));
 
-    const weightResp = await sapAxiosWeight.get(weightPath);
-    const weightResults = weightResp.data?.d?.results || [];
-
-    // 👉 FINAL RESPONSE
-    res.json({
-      gateEntry: gateResults[0], // single
-      weighments: weightResults  // multiple possible
-    });
+    res.json(finalData);
+    console.log('[API] ReprintAPI ->', finalData.length, 'records fetched');
 
   } catch (err) {
-    console.error(
-      'Error fetching data:',
-      err?.response?.status,
-      err?.response?.data || err?.message
-    );
-
-    res.status(500).json({
-      error: err?.response?.data || err?.message || 'Failed'
-    });
+    console.error("ERROR:", err?.response?.data || err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
 
+// QR Weightment API 1
 
 app.get('/api/headers/QRWeightment1/:poNumber', async (req, res) => {
   try {
-    const poNumber = req.params.poNumber;
-
+    const poNumber = req.params.poNumber?.trim();
+    // Get PO Quantity from query param
+    let poQty = req.query.poQty;
+    if (poQty !== undefined && poQty !== null) {
+      poQty = Number(poQty);
+    }
+ 
     if (!poNumber) {
       return res.status(400).json({ error: "PO Number is required" });
     }
-
-    // 🔥 ONLY ONE FIELD FILTER
+ 
     const sapPath = `/YY1_GATEINWARD_OUTWARDDETA?$filter=PurchaseOrderNumber eq '${poNumber}'&$format=json`;
-
     console.log('[API] SAP CALL ->', sapPath);
-
     const resp = await sapAxios.get(sapPath);
-
     const results = resp?.data?.d?.results || [];
-
-    // 🔥 SUM NET WEIGHT (MULTIPLE RECORDS)
-    let totalNetWeight = 0;
-
-    results.forEach(item => {
-      const weight = parseFloat(item.NetWeight || 0);
-      totalNetWeight += weight;
+ 
+    // ✅ TOTAL VendorInvoiceWeight
+    let totalVendorInvoiceWeight = 0;
+    for (const item of results) {
+      let vendor = Number(item.VendorInvoiceWeight);
+      if (isNaN(vendor)) vendor = 0;
+      totalVendorInvoiceWeight += vendor;
+    }
+    totalVendorInvoiceWeight = Math.round(totalVendorInvoiceWeight * 1000) / 1000;
+ 
+ 
+    // ✅ GET BalanceQty3 (always PO main quantity)
+    let balanceQty3 = 0;
+    if (typeof poQty === 'number' && !isNaN(poQty) && poQty > 0) {
+      balanceQty3 = poQty;
+    } else {
+      // If not provided, fetch from SAP PO API
+      try {
+        const poPath = `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'`;
+        const poResp = await sapAxiosPO.get(poPath);
+        const poItems = poResp.data?.value || poResp.data?.d?.results || [];
+        balanceQty3 = poItems.reduce((sum, item) => sum + Number(item.OrderQuantity || 0), 0);
+      } catch (err) {
+        console.error('Error fetching PO main quantity:', err?.response?.data || err?.message);
+        balanceQty3 = 0;
+      }
+    }
+ 
+    // ✅ FINAL BALANCE CALCULATION (always PO main quantity - totalVendorInvoiceWeight)
+    let finalBalance = balanceQty3 - totalVendorInvoiceWeight;
+    finalBalance = Math.max(0, finalBalance);
+    finalBalance = Math.round(finalBalance * 1000) / 1000;
+ 
+    // ✅ DEBUG LOG (optional but useful)
+    console.log({
+      poNumber,
+      balanceQty3,
+      totalVendorInvoiceWeight,
+      finalBalance
     });
-
-    // ✅ RESPONSE
+ 
     res.json({
       purchaseOrder: poNumber,
       count: results.length,
-      totalNetWeight: totalNetWeight.toFixed(3),
+      balanceQty3,
+      totalVendorInvoiceWeight,
+      finalBalance,
       data: results
     });
-
+ 
   } catch (err) {
     console.error(
       'Error fetching gate entry:',
       err?.response?.status,
       err?.response?.data || err?.message
     );
-
     res.status(500).json({
-      error: err?.response?.data || err?.message || 'Failed to fetch gate entry'
+      error:
+        err?.response?.data ||
+        err?.message ||
+        'Failed to fetch gate entry'
     });
   }
 });
-
+ 
+ 
 
 
 
@@ -1086,8 +1122,8 @@ app.get('/api/po/pricing', async (req, res) => {
   try {
     // Use the correct SAP OData4 endpoint for PO pricing
    // const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
-   //  const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
-    const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
+     const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
+   //const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
     const sapRes = await axios.get(url, {
       headers: {
         "Accept": "application/json"
@@ -1116,16 +1152,45 @@ app.get('/api/headers/:id/items', async (req, res) => {
 });
 
  
+// function formatSapODataDate(date) {
+//   if (!date) return null;
+
+//   // If already SAP format → return as is
+//   if (typeof date === "string" && date.startsWith("/Date(")) {
+//     return date;
+//   }
+
+//   const d = new Date(date);
+
+//   if (isNaN(d.getTime())) return null;
+
+//   return `/Date(${d.getTime()})/`;
+// }
+
+// function formatSapTime(timeStr) {
+//   if (!timeStr) return null;
+
+//   // If already SAP format → return as is
+//   if (timeStr.startsWith("PT")) {
+//     return timeStr;
+//   }
+
+//   // If normal format → convert
+//   const [hh, mm, ss] = timeStr.split(":");
+//   return `PT${hh}H${mm}M${ss}S`;
+// }
+// const now = new Date();
+// const systemdate = now.toISOString().split("T")[0];
+// const systemtime = now.toTimeString().split(" ")[0];
+
 function formatSapODataDate(date) {
   if (!date) return null;
 
-  // If already SAP format → return as is
   if (typeof date === "string" && date.startsWith("/Date(")) {
     return date;
   }
 
   const d = new Date(date);
-
   if (isNaN(d.getTime())) return null;
 
   return `/Date(${d.getTime()})/`;
@@ -1134,18 +1199,25 @@ function formatSapODataDate(date) {
 function formatSapTime(timeStr) {
   if (!timeStr) return null;
 
-  // If already SAP format → return as is
   if (timeStr.startsWith("PT")) {
     return timeStr;
   }
 
-  // If normal format → convert
   const [hh, mm, ss] = timeStr.split(":");
   return `PT${hh}H${mm}M${ss}S`;
 }
+
+// ✅ INDIA TIME FIX (only this changed)
 const now = new Date();
-const systemdate = now.toISOString().split("T")[0];
-const systemtime = now.toTimeString().split(" ")[0];
+
+const systemdate = now.toLocaleDateString("en-CA", {
+  timeZone: "Asia/Kolkata"
+});
+
+const systemtime = now.toLocaleTimeString("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hour12: false
+});
 // POST new header (deep insert with items) - Gate Entry
 app.post('/api/headers', async (req, res) => {
   // Only one request at a time can generate and assign a GateEntryNumber
@@ -1156,10 +1228,10 @@ app.post('/api/headers', async (req, res) => {
 if (req.body.Indicators === "I") {
  
 
-const now = new Date();
+// const now = new Date();
 
-const systemdate = now.toISOString().split("T")[0];
-const systemtime = now.toTimeString().split(" ")[0];
+// const systemdate = now.toISOString().split("T")[0];
+// const systemtime = now.toTimeString().split(" ")[0];
 
 // 🔹 Step 1: Collect POs
 const poNumbers = [
@@ -1176,8 +1248,8 @@ let allPOItems = [];
 for (const po of poNumbers) {
   try {
 //const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
-//    const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
-      const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
+    const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
+ //  const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
 
     const resp = await sapAxios.get(url, {
       auth: {
@@ -1333,8 +1405,8 @@ allPOItems.forEach((poItem, index) => {
     if (req.body.Indicators === "O") {
       
      //   const sodetails = "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
-      //  const sodetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
-       const sodetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
+       const sodetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
+     // const sodetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
   + req.body.SalesDocument + "'&$format=json";
  
 const sodetailsresp = await sapAxios.get(sodetails, {
@@ -1343,10 +1415,25 @@ const sodetailsresp = await sapAxios.get(sodetails, {
     password: SAP_PASS
   }
 });
+
+//Transporter details can also be fetched here if needed using req.body.TransporterCode and similar approach
+const transporterDetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
+
+//const transporterDetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
+
+const transporterDetailsResp = await sapAxiosTransporter.get(transporterDetails, {
+  auth: {
+    username: SAP_USER,
+    password: SAP_PASS
+  }
+});
  
 const sodetailsresults = sodetailsresp.data?.d?.results || [];
- 
+const transporterDetailsResults = transporterDetailsResp.data?.d?.results || [];
+const tdr = transporterDetailsResults[0] || {};
+
 console.log('SO details for SalesDocument', req.body.SalesDocument, sodetailsresults);
+console.log('Transporter details for TransporterCode', req.body.TransporterCode, transporterDetailsResults);
  
 if (sodetailsresults.length > 0) {
  
@@ -1357,6 +1444,9 @@ if (sodetailsresults.length > 0) {
   }
   if (!input.PurchaseOrderItem) {
     input.PurchaseOrderItem = soItem.SalesDocumentItem;
+  }
+  if (!input.TransporterName) {
+    input.TransporterName = tdr.Transporter;
   }
   if (!input.Material) {
     input.Material = soItem.Product;
@@ -1401,15 +1491,7 @@ if (sodetailsresults.length > 0) {
 
       // Generate GateEntryNumber if not present
       if (!input.GateEntryNumber) {
-        // let code = input.SeriesCode;
-        // // Fallback: use Indicators to determine default code
-        // if (!code) {
-        //   if (input.Indicators === "O") code = "1"; // Outward (SD)
-        //   else if (input.Indicators === "I") code = "2"; // Inward (MM)
-        //   else code = "1"; // Default to SD
-        // }
         let code = input.SeriesCode;
-
 if (!code) {
   switch (input.Indicators) {
     case "O": code = "1"; break; // Outward
@@ -1464,9 +1546,10 @@ if (!code) {
   });
 });
 
+
 //const SAP_URL2 ="https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS";
-//const SAP_URL2 ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS";
-const SAP_URL2 ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS";
+const SAP_URL2 ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS";
+//const SAP_URL2 ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_CAPTURINGWEIGHTDETAILS_CDS/YY1_CAPTURINGWEIGHTDETAILS";
 const SAP_USER2 = "BTPINTEGRATION";
 const SAP_PASS2 = "BTPIntegration@1234567890";
 
@@ -1534,7 +1617,11 @@ app.post('/api/headers/material/in', async (req, res) => {
     // 2️⃣ MERGE GATE ENTRY → WEIGHMENT
     // ==========================
     if (header) {
-
+      input.TruckNumber = header.VehicleNumber;
+      input.TransporterCode = header.TransporterCode;
+    //  input.TransporterName = header.TransporterName;
+      input.LRGCNumber = header.LRGCNumber;
+      input.PermitNumber = header.PermitNumber;
       input.Material = header.Material;
       input.Material2 = header.Material2;
       input.Material3 = header.Material3;
@@ -1569,6 +1656,27 @@ app.post('/api/headers/material/in', async (req, res) => {
       input.PurchaseOrderItem4 = header.PurchaseOrderItem4;
       input.PurchaseOrderNumber5 = header.PurchaseOrderNumber5;
       input.PurchaseOrderItem5 = header.PurchaseOrderItem5;
+
+      input.VendorInvoiceNumber = header.VendorInvoiceNumber;
+      input.VendorInvoiceNumber2 = header.VendorInvoiceNumber2;
+      input.VendorInvoiceNumber3 = header.VendorInvoiceNumber3;
+      input.VendorInvoiceNumber4 = header.VendorInvoiceNumber4;
+      input.VendorInvoiceNumber5 = header.VendorInvoiceNumber5;
+      input.VendorInvoiceDate = header.VendorInvoiceDate;
+      input.VendorInvoiceDate2 = header.VendorInvoiceDate2;
+      input.VendorInvoiceDate3 = header.VendorInvoiceDate3;
+      input.VendorInvoiceDate4 = header.VendorInvoiceDate4;
+      input.VendorInvoiceDate5 = header.VendorInvoiceDate5;
+      input.VendorInvoiceWeight = header.VendorInvoiceWeight;
+      input.VendorInvoiceWeight2 = header.VendorInvoiceWeight2;
+      input.VendorInvoiceWeight3 = header.VendorInvoiceWeight3;
+      input.VendorInvoiceWeight4 = header.VendorInvoiceWeight4;
+      input.VendorInvoiceWeight5 = header.VendorInvoiceWeight5;
+      input.BalanceQty = header.BalanceQty;
+      input.BalanceQty2 = header.BalanceQty2;
+      input.BalanceQty3 = header.BalanceQty3;
+      input.BalanceQty4 = header.BalanceQty4;
+      input.BalanceQty5 = header.BalanceQty5;
     }
 
     // ==========================
@@ -1660,9 +1768,18 @@ app.patch('/api/headers/weighmentupdate/:gentry', async (req, res) => {
   const updateFields = sanitizePayloadForSapServerSide(req.body);
   try {
     // 1. Fetch the record by GateEntryNumber to get the UUID
-    const now = new Date();
-    const systemdate = now.toISOString().split("T")[0];
-    const systemtime = now.toTimeString().split(" ")[0];
+
+// ✅ INDIA TIME FIX (only this changed)
+const now = new Date();
+
+const systemdate = now.toLocaleDateString("en-CA", {
+  timeZone: "Asia/Kolkata"
+});
+
+const systemtime = now.toLocaleTimeString("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hour12: false
+});
     updateFields.VehicleStatus = "OUT"; 
     updateFields.OutwardTime = formatSapTime(systemtime);
     updateFields.GateOutDate = formatSapODataDate(systemdate);
@@ -3258,8 +3375,8 @@ app.get('/api/purchaseorder/:poNumber', async (req, res) => {
     const headerPath = `/PurchaseOrder?$filter=PurchaseOrder eq '${poNumber}'&$top=1&$format=json`;
     const itemPath = `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
  //   const rfidPath = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
-  //  const rfidPath = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
-    const rfidPath = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
+   const rfidPath = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
+ //   const rfidPath = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
 
     const [headerResponse, itemResponse, rfidResponse] = await Promise.all([
       sapAxiosPO.get(headerPath),
@@ -3525,7 +3642,7 @@ app.get('/api/sodetails', async (req, res) => {
       items: (itemsBySO[h.SalesDocument] || []).map(li => ({
         Material: li.Product,
         MaterialDescription: li.ProductDescription,
-        BalanceQty: li.OpenReqdDelivQtyInOrdQtyUnit,
+        DeliveryBalancyQTY: li.DeliveryBalancyQTY,
         BalanceQtyUnit: li.OrderQuantity
       }))
     }));
@@ -3598,13 +3715,11 @@ if (weight && weight.GateEntryNumber === WeightDocument.GateEntryNumber && weigh
 function formatSapODataDate(date) {
   if (!date) return null;
 
-  // If already SAP format → return as is
   if (typeof date === "string" && date.startsWith("/Date(")) {
     return date;
   }
 
   const d = new Date(date);
-
   if (isNaN(d.getTime())) return null;
 
   return `/Date(${d.getTime()})/`;
@@ -3613,17 +3728,25 @@ function formatSapODataDate(date) {
 function formatSapTime(timeStr) {
   if (!timeStr) return null;
 
-  // If already SAP format → return as is
   if (timeStr.startsWith("PT")) {
     return timeStr;
   }
 
-  // If normal format → convert
   const [hh, mm, ss] = timeStr.split(":");
   return `PT${hh}H${mm}M${ss}S`;
 }
-const systemdate = new Date().toISOString().split("T")[0];
-const systemtime = new Date().toTimeString().split(" ")[0];
+
+// ✅ INDIA TIME FIX (only this changed)
+const now = new Date();
+
+const systemdate = now.toLocaleDateString("en-CA", {
+  timeZone: "Asia/Kolkata"
+});
+
+const systemtime = now.toLocaleTimeString("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hour12: false
+});
     const entry = gateEntries[0];
     console.log('Fetched gate entry from SAP:', entry);
     console.log('Weighment 1 data :', WeightDocument);
@@ -3632,6 +3755,7 @@ const systemtime = new Date().toTimeString().split(" ")[0];
       YY1_LRNo_DLH: entry.LRGCNumber,
       YY1_GateEntryNo_DLH: entry.GateEntryNumber,
       YY1_LRDate_DLH: formatSapODataDate(systemdate),
+  //    YY1_TransporterID_DLH: entry.TransporterCode,
       YY1_TransporterID_DLH: entry.TransporterCode,
       YY1_TransporterName_DLH: entry.TransporterName,
       YY1_TruckNumber_DLH: entry.VehicleNumber,
@@ -3666,13 +3790,14 @@ const systemtime = new Date().toTimeString().split(" ")[0];
       obdResp.data?.d?.DeliveryNumber ||
       obdResp.data?.DeliveryNumber ||
       null;
+
     // 2. Assign SAP fields directly to weightInput
     const weightInput = sanitizePayloadForSapServerSide(WeightDocument);
    // weightInput.SerialCode = "3";
     weightInput.OutboundDelivery = outboundDeliveryNumber;
     // Assign SAP fields directly
     weightInput.GateEntryNumber = entry.GateEntryNumber;
-    weightInput.TruckNumber = WeightDocument.TruckNumber || entry.TruckNumber;
+    weightInput.TruckNumber = entry.VehicleNumber;
     weightInput.TruckCapacity = WeightDocument.TruckCapacity || entry.TruckCapacity;
     weightInput.TareWeight = WeightDocument.TareWeight || entry.TareWeight;
     weightInput.GateEntryDate = formatSapODataDate(systemdate);
@@ -4220,43 +4345,71 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
     }
       console.log(getResp?.data?.d?.results?.[0], "Weighement response getResp data");
  
-    /* ==========================
-       1️⃣ UPDATE WEIGHMENT
-    ========================== */
-    //  WeighmentUpdate.VehicleStatus = "OUT";
-    //  WeighmentUpdate.OutwardTime = formatSapTime(systemtime);
-    //  WeighmentUpdate.OutEntryDate = formatSapODataDate(systemdate);
 
-    // if (GateEntryNumber && WeighmentUpdate) {
-    //   if (!uuid) return res.status(404).json({ error: "Weighment not found" });
-    //   const { token, cookies } = await fetchCsrfTokenWeight();
-    //   await sapAxiosWeight.patch(
-    //     `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`,
-    //     WeighmentUpdate,
-    //     {
-    //       headers: {
-    //         "Content-Type": "application/json",
-    //         "x-csrf-token": token,
-    //         "If-Match": "*",
-    //         Cookie: cookies
-    //       }
-    //     }
-    //   );
-    //   result.weighment = "Updated";
-    // }
-const now1 = new Date();
-
-const systemdate1 = now1.toISOString().split("T")[0];
-const systemtime1 = now1.toTimeString().split(" ")[0];
 
 if (!WeighmentUpdate) {
   WeighmentUpdate = {};
 }
 
+function formatSapODataDate(date) {
+  if (!date) return null;
+
+  if (typeof date === "string" && date.startsWith("/Date(")) {
+    return date;
+  }
+
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  return `/Date(${d.getTime()})/`;
+}
+
+function formatSapTime(timeStr) {
+  if (!timeStr) return null;
+
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
+
+// ✅ INDIA TIME FIX (only this changed)
+const now = new Date();
+
+const systemdate = now.toLocaleDateString("en-CA", {
+  timeZone: "Asia/Kolkata"
+});
+
+const systemtime = now.toLocaleTimeString("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hour12: false
+});
+
+function formatDateDDMMYYYY(date) {
+  const d = new Date(date);
+
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+
+  return `${day}.${month}.${year}`;
+}
+
+const now1 = new Date();
+
+// IST Date
+const istDate = new Date(
+  now1.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+);
+
+// Format date
+const formattedDate = formatDateDDMMYYYY(istDate);
 // ✅ use correct field names
 WeighmentUpdate.VehicleStatus = "OUT";
-WeighmentUpdate.OutwardTime = formatSapTime(systemtime1);
-WeighmentUpdate.GateOutDate = formatSapODataDate(systemdate1);
+WeighmentUpdate.OutwardTime = formatSapTime(systemtime);
+WeighmentUpdate.GateOutDate = formatSapODataDate(systemdate);
 
 if (GateEntryNumber && WeighmentUpdate) {
   if (!uuid) return res.status(404).json({ error: "Weighment not found" });
@@ -4282,32 +4435,47 @@ if (GateEntryNumber && WeighmentUpdate) {
     /* ==========================
        2️⃣ UPDATE OUTBOUND DELIVERY ITEMS
     ========================== */
-    function formatSapODataDate(date) {
-    if (!date) return null;
-     if (typeof date === 'string' && date.startsWith('/Date(')) return date;
-     const d = new Date(date);
-    if (isNaN(d.getTime())) return null;
-     return `/Date(${d.getTime()})/`;
-     }
 
-     function formatSapTime(timeStr) {
-     if (!timeStr) return null;
-
-      // If already SAP format → return as is
-      if (timeStr.startsWith("PT")) {
-      return timeStr;
-      }
-      const [hh, mm, ss] = timeStr.split(":");
-      return `PT${hh}H${mm}M${ss}S`;
-       }
-
-      const now = new Date();
-     const systemdate = now.toISOString().split("T")[0];
-     const systemtime = now.toTimeString().split(" ")[0];
     if (OutboundDeliveryUpdate?.DeliveryDocument && OutboundDeliveryUpdate?.Items?.length) {
             for (const item of OutboundDeliveryUpdate.Items) {
             const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
             // PATCH Outbound Delivery Header with custom fields
+            const { token: obdToken, cookies: obdCookies } = await fetchCsrfTokenOutboundDelivery();
+            const newDoc = OutboundDeliveryUpdate.DeliveryDocument;
+            if (newDoc) {
+            const textPath = '/A_OutbDeliveryHeaderText';
+            const textsToCreate = [
+            {
+             DeliveryDocument: newDoc,
+             TextElement: "JGVN",
+             Language: "EN",
+             TextElementText: String(getResp?.data?.d?.results?.[0]?.TruckNumber || "").trim()
+            },
+            {
+             DeliveryDocument: newDoc,
+             TextElement: "JGEB",
+             Language: "EN",
+             TextElementText: "Regular"
+             },
+             {
+             DeliveryDocument: newDoc,
+             TextElement: "JGTD",
+             Language: "EN",
+             TextElementText: formattedDate, 
+             }
+             ];
+
+            for (const txt of textsToCreate) {
+            try {
+            await sapAxiosOBD.post(textPath, txt, {
+            headers: { 'x-csrf-token': obdToken, Cookie: obdCookies }
+            });
+            console.log(`[INFO] Text ${txt.TextElement} added to ${newDoc}`);
+            } catch (txtErr) {
+            console.error(`[ERROR] Failed to add text ${txt.TextElement}:`, txtErr.response?.data || txtErr.message);
+            }
+            }
+            }
             const headerPath = `/A_OutbDeliveryHeader(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}')`;
             const headerPayload = {
               YY1_WeighbridgeDate_DLH: formatSapODataDate(getResp?.data?.d?.results?.[0]?.GateOutDate),
@@ -4317,6 +4485,7 @@ if (GateEntryNumber && WeighmentUpdate) {
               YY1_PGIDate_DLH: formatSapODataDate(systemdate),
               YY1_PGITime_DLH: formatSapTime(systemtime),
               YY1_LRDate_DLH: formatSapODataDate(systemdate),
+              BillOfLading: (getResp?.data?.d?.results?.[0]?.LRGCNumber || ''),
               // Add other custom header fields as needed
             };
             await sapAxiosOBD.patch(headerPath, headerPayload, {
@@ -4513,20 +4682,21 @@ if (GateEntryNumber && WeighmentUpdate) {
             }
             console.log(`📄 PDF for ${billingDocNumber} processed in background`);
 // Additionally, send PDF to printer API
-       try {
-       // Call your own printer API
-    const printResp = await axios.post(
-     "http://localhost:4600/api/printer/print",
-  //  "https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print",
-     {
-    pdfBase64: pdfBuffer.toString("base64"),
-    fileName: `Billing_${billingDocNumber}.pdf`
-     }
-     );
-       console.log("✅ Billing PDF sent to printer:", printResp.data);
-     } catch (printErr) {
-     console.error("❌ Failed to print billing PDF:", printErr?.message);
-     }
+  //      try {
+  //      // Call your own printer API
+  // //   const printResp = await axios.post(
+  // //    "http://localhost:4600/api/printer/print",
+  // // //  "https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print",
+  // //    {
+  // //   pdfBase64: pdfBuffer.toString("base64"),
+  // //   fileName: `Billing_${billingDocNumber}.pdf`
+  // //    }
+  // //    );
+  // //      console.log("✅ Billing PDF sent to printer:", printResp.data);
+  //    } 
+  //    catch (printErr) {
+  //    console.error("❌ Failed to print billing PDF:", printErr?.message);
+  //    }
 
      (async () => {
   try {
@@ -4539,32 +4709,32 @@ if (GateEntryNumber && WeighmentUpdate) {
 
     console.log("Weighment data:", weighmentData);
 
-    const slipBuffer = await generateWeighmentSlip({
-      WeightDocNumber: weighmentData.WeightDocNumber,
-      GateEntryNumber: weighmentData.GateEntryNumber,
-      VehicleNumber: weighmentData.VehicleNumber,
-      Party: weighmentData.Party,
-      Transporter: weighmentData.TransporterCode,
-      Material: weighmentData.MaterialDescription,
-      GrossWeight: weighmentData.GrossWeight,
-      TareWeight: weighmentData.TareWeight,
-      NetWeight: weighmentData.NetWeight,
-      InwardTime: formatSapTime(weighmentData.InwardTime),
-      OutwardTime: formatSapTime(weighmentData.OutwardTime),
-      SalesDocument2: weighmentData.SalesDocument2,
-      Customer: weighmentData.Customer,
-      CustomerName: weighmentData.CustomerName,
-      MaterialNumber: weighmentData.Material
+    // const slipBuffer = await generateWeighmentSlip({
+    //   WeightDocNumber: weighmentData.WeightDocNumber,
+    //   GateEntryNumber: weighmentData.GateEntryNumber,
+    //   VehicleNumber: weighmentData.VehicleNumber,
+    //   Party: weighmentData.Party,
+    //   Transporter: weighmentData.TransporterCode,
+    //   Material: weighmentData.MaterialDescription,
+    //   GrossWeight: weighmentData.GrossWeight,
+    //   TareWeight: weighmentData.TareWeight,
+    //   NetWeight: weighmentData.NetWeight,
+    //   InwardTime: formatSapTime(weighmentData.InwardTime),
+    //   OutwardTime: formatSapTime(weighmentData.OutwardTime),
+    //   SalesDocument2: weighmentData.SalesDocument2,
+    //   Customer: weighmentData.Customer,
+    //   CustomerName: weighmentData.CustomerName,
+    //   MaterialNumber: weighmentData.Material
 
-    });
+    // });
 
-    await axios.post("http://localhost:4600/api/printer/print", {
+  //  await axios.post("http://localhost:4600/api/printer/print", {
   //  await axios.post("https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print", {
-      pdfBase64: slipBuffer.toString("base64"),
-      fileName: `Weighment_${weighmentData.GateEntryNumber}.pdf`
-    });
+   //   pdfBase64: slipBuffer.toString("base64"),
+  //    fileName: `Weighment_${weighmentData.GateEntryNumber}.pdf`
+  //  });
 
-    console.log("✅ Weighment slip printed");
+  //  console.log("✅ Weighment slip printed");
 
   } catch (err) {
     console.error("Weighment print error:", err.message);
@@ -4594,60 +4764,60 @@ if (GateEntryNumber && WeighmentUpdate) {
  
 // const PDFDocument = require("pdfkit");
 
-function generateWeighmentSlip(data) {
-  return new Promise((resolve) => {
-    const doc = new PDFDocument({ size: "A4", margin: 30 });
-    const buffers = [];
+// function generateWeighmentSlip(data) {
+//   return new Promise((resolve) => {
+//     const doc = new PDFDocument({ size: "A4", margin: 30 });
+//     const buffers = [];
 
-    doc.on("data", buffers.push.bind(buffers));
-    doc.on("end", () => resolve(Buffer.concat(buffers)));
+//     doc.on("data", buffers.push.bind(buffers));
+//     doc.on("end", () => resolve(Buffer.concat(buffers)));
 
-    // HEADER
-    doc.fontSize(16).text("Minera Steel & Power Pvt Ltd", { align: "center" });
-    doc.fontSize(10).text("Factory Address: Yerabanahalli Village Sandur taluk Ballari", { align: "center" });
-    doc.moveDown();
+//     // HEADER
+//     doc.fontSize(16).text("Minera Steel & Power Pvt Ltd", { align: "center" });
+//     doc.fontSize(10).text("Factory Address: Yerabanahalli Village Sandur taluk Ballari", { align: "center" });
+//     doc.moveDown();
 
-    doc.fontSize(14).text("Weighbridge Ticket", { align: "center" });
-    doc.moveDown();
+//     doc.fontSize(14).text("Weighbridge Ticket", { align: "center" });
+//     doc.moveDown();
 
-    // DATE & TIME
-    doc.fontSize(10);
-    doc.text(`Print Date: ${new Date().toLocaleDateString()}`);
-    doc.text(`Time: ${new Date().toLocaleTimeString()}`);
-    doc.moveDown();
+//     // DATE & TIME
+//     doc.fontSize(10);
+//     doc.text(`Print Date: ${new Date().toLocaleDateString()}`);
+//     doc.text(`Time: ${new Date().toLocaleTimeString()}`);
+//     doc.moveDown();
 
-    doc.text("------------------------------------------------------------");
+//     doc.text("------------------------------------------------------------");
 
-    // LEFT SIDE
-    doc.text(`Weighment No : ${data.WeightDocNumber}`);
-    doc.text(`Gate Entry No: ${data.GateEntryNumber}`);
-    doc.text(`Truck Number : ${data.VehicleNumber}`);
-    doc.text(`Transporter  : ${data.Transporter}`);
+//     // LEFT SIDE
+//     doc.text(`Weighment No : ${data.WeightDocNumber}`);
+//     doc.text(`Gate Entry No: ${data.GateEntryNumber}`);
+//     doc.text(`Truck Number : ${data.VehicleNumber}`);
+//     doc.text(`Transporter  : ${data.Transporter}`);
 
-    doc.moveDown();
+//     doc.moveDown();
 
-    // RIGHT SIDE
-    doc.text(`Customer      : ${data.Customer} - ${data.CustomerName}`);
-    doc.text(`Material No   : ${data.MaterialNumber}`);
-    doc.text(`Product      : ${data.Material}`);
-    doc.text(`Gross Weight : ${data.GrossWeight} t`);
-    doc.text(`Tare Weight  : ${data.TareWeight} t`);
-    doc.text(`Net Weight   : ${data.NetWeight} t`);
+//     // RIGHT SIDE
+//     doc.text(`Customer      : ${data.Customer} - ${data.CustomerName}`);
+//     doc.text(`Material No   : ${data.MaterialNumber}`);
+//     doc.text(`Product      : ${data.Material}`);
+//     doc.text(`Gross Weight : ${data.GrossWeight} t`);
+//     doc.text(`Tare Weight  : ${data.TareWeight} t`);
+//     doc.text(`Net Weight   : ${data.NetWeight} t`);
 
-    doc.moveDown();
+//     doc.moveDown();
 
-    // TIME DETAILS
-    doc.text(`In Time  : ${data.InwardTime}`);
-    doc.text(`Out Time : ${data.OutwardTime}`);
+//     // TIME DETAILS
+//     doc.text(`In Time  : ${data.InwardTime}`);
+//     doc.text(`Out Time : ${data.OutwardTime}`);
 
-    doc.moveDown();
+//     doc.moveDown();
 
-    doc.text("------------------------------------------------------------");
-    doc.text("Note: This vehicle weighment includes driver weight");
+//     doc.text("------------------------------------------------------------");
+//     doc.text("Note: This vehicle weighment includes driver weight");
 
-    doc.end();
-  });
-}
+//     doc.end();
+//   });
+// }
 
 
 
@@ -4960,7 +5130,37 @@ app.get('/api/products', async (req, res) => {
   }
 });
  
-//GRN Creation based on PO Number and ZMad Creation
+
+
+app.get('/api/weightdetails', async (req, res) => 
+  { try 
+    { const { gateEntryNumber } = req.query; 
+
+if (!gateEntryNumber) { return res.status(400).json({ error: "gateEntryNumber is required" }); } // ================= GATE ENTRY ================= 
+const gatePath =`https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
+//const gatePath = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`; 
+const gateResp = await sapAxios.get(gatePath); 
+const gateResults = gateResp.data?.d?.results || []; if (!gateResults.length) { return res.json({ gateEntry: null, weighments: [], billing: [] }); } 
+const gate = gateResults[0]; 
+// ================= WEIGHMENT =================
+const weightPath = `/YY1_CAPTURINGWEIGHTDETAILS?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`; 
+const weightResp = await sapAxiosWeight.get(weightPath); 
+const weightResults = weightResp.data?.d?.results || []; 
+// ================= BILLING ================= 
+let billingData = []; 
+const obd = weightResults[0]?.OutboundDelivery; 
+console.log('[DEBUG] Outbound Delivery for billing fetch:', obd); 
+if (obd) { 
+  const billingPath = `/BillingDocumentItem?$filter=ReferenceSDDocument eq '${obd}'&$format=json`; 
+const billingResp = await sapAxiosBilling.get(billingPath); 
+billingData = billingResp.data?.d?.results || []; }
+ res.json({ gateEntry: gate, weighments: weightResults, billing: billingData }); } 
+ catch (err) { console.error('ERROR:', err?.response?.data || err.message); 
+  res.status(500).json({ error: err.message }); } });
+
+
+
+  //GRN Creation based on PO Number and ZMad Creation
 
 // Fetch CSRF token for GRN OData service
 async function fetchCsrfTokenGRN() {
@@ -5016,6 +5216,7 @@ app.post('/api/create-grn', async (req, res) => {
           auth: { username: SAP_USER2, password: SAP_PASS2 },
           headers: { Accept: "application/json" }
         });
+    
 
         const gateResults = response.data?.d?.results || response.data?.value || [];
         const entry = gateResults.find(r => (r.Indicators || "").toUpperCase() === "I");
@@ -5023,6 +5224,24 @@ app.post('/api/create-grn', async (req, res) => {
           results.push({ gateEntryNumber: entryNum, error: "Inward Gate Entry not found" });
           continue;
         }
+        console.log(`Fetched gate entry data for ${entryNum}:`, gateResults);
+
+        // //Gate Entry Details Getting based on Gate Entry Number
+        // const filter2 = `$filter=GateEntryNumber eq '${entryNum}'&$format=json`;
+        // const fullUrl2 = `${SAP_BASE}?${filter2}`;
+        // const response2 = await axios.get(fullUrl2, {
+        //   auth: { username: SAP_USER2, password: SAP_PASS2 },
+        //   headers: { Accept: "application/json" }
+        // });
+
+        // const gateResults2 = response2.data?.d?.results || response2.data?.value || [];
+        // const entry2 = gateResults2.find(r => (r.Indicators || "").toUpperCase() === "I");
+        // if (!entry2) {
+        //   results.push({ gateEntryNumber: entryNum, error: "Inward Gate Entry not found" });
+        //   continue;
+        // }
+        // console.log(`Fetched gate entry details2 for ${entryNum}:`, gateResults2);
+
 
         if (!entry.PurchaseOrderNumber || !entry.Material || !entry.NetWeight) {
           results.push({ gateEntryNumber: entryNum, error: "Incomplete Gate Entry data (PO / Material / Qty missing)" });
@@ -5061,8 +5280,13 @@ app.post('/api/create-grn', async (req, res) => {
                 PurchaseOrder: entry.PurchaseOrderNumber,
                 PurchaseOrderItem: item.PurchaseOrderItem,
                 GoodsMovementRefDocType: "B",
-                EntryUnit:  item.BaseUnit || "KG",
-                QuantityInEntryUnit: String(entry.NetWeight)
+                EntryUnit:  item.BaseUnit,
+                //Minimum of NetWeight and VendorInvoiceWeight to avoid excess quantity issues in SAP
+                QuantityInEntryUnit: String(
+                entry.NetWeight < entry.VendorInvoiceWeight 
+                ? entry.NetWeight 
+                : entry.VendorInvoiceWeight),
+                UnloadingPointName: entry.TruckNumber,
               }
             ]
           }
@@ -5117,15 +5341,23 @@ app.post('/api/create-grn', async (req, res) => {
     });
 
   } catch (err) {
-    const sapError =
-      err?.response?.data?.error?.message?.value ||
-      err?.response?.data?.error?.message ||
-      err.message;
+  const sapError =
+    err?.response?.data?.error?.message?.value ||
+    err?.response?.data?.error?.message ||
+    err?.response?.data ||
+    err.message ||
+    "Unknown error";
 
-    console.error("GRN ERROR:", sapError);
+  const statusCode = err?.response?.status || 500;
 
-    res.status(500).json({ error: sapError });
-  }
+  console.error("GRN ERROR FULL:", err?.response?.data || err);
+  console.error("GRN ERROR MESSAGE:", sapError);
+
+  res.status(statusCode).json({
+    success: false,
+    error: sapError
+  });
+}
 });
 
 

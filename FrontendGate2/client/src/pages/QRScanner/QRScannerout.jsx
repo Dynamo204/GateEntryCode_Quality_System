@@ -1,4 +1,69 @@
- // Print weighment slip
+// Helper to parse SAP duration (e.g. PT15H46M07S) to HH:MM:SS
+function parseSapDurationToTime(sapDuration) {
+  if (!sapDuration) return '-';
+  const m = sapDuration.match(/^PT(\d{1,2})H(\d{1,2})M(\d{1,2})S$/i);
+  if (!m) return '-';
+  const [, h, mnt, s] = m;
+  return [h, mnt, s].map(v => v.padStart(2, '0')).join(':');
+}
+
+// Helper to parse ISO date (e.g. 2026-04-04T00:00:00) to DD-MM-YYYY (Indian format)
+function parseIsoDateToDMY(isoDate) {
+  if (!isoDate) return '-';
+  let d = isoDate;
+  if (d.includes('T')) d = d.split('T')[0];
+  if (d === '0000-00-00') return '-';
+  const [yyyy, mm, dd] = d.split('-');
+  if (!yyyy || !mm || !dd) return '-';
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+// Helper to format JS Date to DD-MM-YYYY
+function formatDateDMY(date) {
+  if (!date) return '-';
+  if (typeof date === 'string') {
+    // Try to parse as ISO or OData
+    if (date.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return parseIsoDateToDMY(date);
+    }
+    // OData format: /Date(1710115200000)/
+    const m = date.match(/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/);
+    if (m) {
+      const d = new Date(Number(m[1]));
+      return formatDateDMY(d);
+    }
+  }
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// Helper to format time (HH:MM:SS) from SAP duration or string
+function formatTimeHHMMSS(val) {
+  if (!val) return '-';
+  if (typeof val === 'string') {
+    // SAP duration: PT15H46M07S
+    const m = val.match(/^PT(\d{1,2})H(\d{1,2})M(\d{1,2})S$/i);
+    if (m) {
+      return [m[1], m[2], m[3]].map(v => v.padStart(2, '0')).join(':');
+    }
+    // Already HH:MM:SS
+    if (/^\d{2}:\d{2}:\d{2}$/.test(val)) return val;
+    // ISO string
+    if (val.includes('T')) {
+      const t = val.split('T')[1];
+      return t ? t.split('.')[0] : '-';
+    }
+  }
+  if (val instanceof Date) {
+    return val.toTimeString().split(' ')[0];
+  }
+  return String(val);
+}
+// Print weighment slip (logo is now in JSX)
   const handlePrintSlip = () => {
     const printContents = document.getElementById('weighment-slip-print-area').innerHTML;
     const originalContents = document.body.innerHTML;
@@ -98,12 +163,19 @@ export default function CreateHeader() {
   };
 
   const [header, setHeader] = useState(createInitialHeaderState());
-  // Store the original BalanceQty fetched from backend for calculation
-  const originalBalanceQtyRef = useRef(null);
+  // Store the original BalanceQty for calculation (production safe)
+  const [originalBalance, setOriginalBalance] = useState(null);
+  // Store the original BalanceQty from backend only once
+  useEffect(() => {
+    if (header.BalanceQty && originalBalance === null) {
+      setOriginalBalance(parseFloat(header.BalanceQty));
+    }
+  }, [header.BalanceQty, originalBalance]);
   const [loading, setLoading] = useState(false);
   const [tareWeightLoading, setTareWeightLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [scanFetchTick, setScanFetchTick] = useState(0);
   const [selectedInboundRecord, setSelectedInboundRecord] = useState(null);
   const [transporterDropdown, setTransporterDropdown] = useState({
@@ -256,39 +328,16 @@ export default function CreateHeader() {
         Division: toFieldString(record.Division, prev.Division),
         Remarks: toFieldString(record.Remarks, prev.Remarks),
         SubTransporterName: toFieldString(firstDefinedValue(record.SubTransporterName, record.SubTransporter), prev.SubTransporterName),
-        TareWeight: toFieldString(record.TareWeight, prev.TareWeight),
+        // Do NOT auto-fill TareWeight from fetched record; always keep as is (empty or user input)
+        // TareWeight: toFieldString(record.TareWeight, prev.TareWeight),
         GrossWeight: toFieldString(firstDefinedValue(record.GrossWeight, record.GrossWeght), prev.GrossWeight),
         NetWeight: toFieldString(firstDefinedValue(record.NetWeight, record.NetWeght), prev.NetWeight),
         PurchaseOrderNumber: toFieldString(firstDefinedValue(record.PurchaseOrderNumber, record.PurchaseOrder, record.SalesDocument), prev.PurchaseOrderNumber),
-        PurchaseOrderNumber2: toFieldString(record.PurchaseOrderNumber2, prev.PurchaseOrderNumber2),
-        PurchaseOrderNumber3: toFieldString(record.PurchaseOrderNumber3, prev.PurchaseOrderNumber3),
-        PurchaseOrderNumber4: toFieldString(record.PurchaseOrderNumber4, prev.PurchaseOrderNumber4),
-        PurchaseOrderNumber5: toFieldString(record.PurchaseOrderNumber5, prev.PurchaseOrderNumber5),
         Material: toFieldString(firstDefinedValue(record.Material, parsedRemarks.material), prev.Material),
-        Material2: toFieldString(record.Material2, prev.Material2),
-        Material3: toFieldString(record.Material3, prev.Material3),
-        Material4: toFieldString(record.Material4, prev.Material4),
-        Material5: toFieldString(record.Material5, prev.Material5),
         MaterialDescription: toFieldString(firstDefinedValue(record.MaterialDescription, parsedRemarks.grade), prev.MaterialDescription),
-        MaterialDescription2: toFieldString(record.MaterialDescription2, prev.MaterialDescription2),
-        MaterialDescription3: toFieldString(record.MaterialDescription3, prev.MaterialDescription3),
-        MaterialDescription4: toFieldString(record.MaterialDescription4, prev.MaterialDescription4),
-        MaterialDescription5: toFieldString(record.MaterialDescription5, prev.MaterialDescription5),
         Vendor: toFieldString(firstDefinedValue(record.Vendor, record.Supplier, record.Customer), prev.Vendor),
-        Vendor2: toFieldString(record.Vendor2, prev.Vendor2),
-        Vendor3: toFieldString(record.Vendor3, prev.Vendor3),
-        Vendor4: toFieldString(record.Vendor4, prev.Vendor4),
-        Vendor5: toFieldString(record.Vendor5, prev.Vendor5),
         VendorName: toFieldString(firstDefinedValue(record.VendorName, record.SupplierName, record.CustomerName), prev.VendorName),
-        VendorName2: toFieldString(record.VendorName2, prev.VendorName2),
-        VendorName3: toFieldString(record.VendorName3, prev.VendorName3),
-        VendorName4: toFieldString(record.VendorName4, prev.VendorName4),
-        VendorName5: toFieldString(record.VendorName5, prev.VendorName5),
         VendorInvoiceNumber: toFieldString(firstDefinedValue(record.VendorInvoiceNumber, record.HandInvoiceNumber, record.SalesDocument, parsedRemarks.VendorInvoiceNumber), prev.VendorInvoiceNumber),
-        VendorInvoiceNumber2: toFieldString(record.VendorInvoiceNumber2, prev.VendorInvoiceNumber2),
-        VendorInvoiceNumber3: toFieldString(record.VendorInvoiceNumber3, prev.VendorInvoiceNumber3),
-        VendorInvoiceNumber4: toFieldString(record.VendorInvoiceNumber4, prev.VendorInvoiceNumber4),
-        VendorInvoiceNumber5: toFieldString(record.VendorInvoiceNumber5, prev.VendorInvoiceNumber5),
         VendorInvoiceDate: toInputDate(
           firstDefinedValue(
             record.VendorInvoiceDate,
@@ -300,20 +349,11 @@ export default function CreateHeader() {
           ),
           prev.VendorInvoiceDate
         ),
-        VendorInvoiceDate2: toInputDate(firstDefinedValue(record.VendorInvoiceDate2, record["d:VendorInvoiceDate2"]), prev.VendorInvoiceDate2),
-        VendorInvoiceDate3: toInputDate(firstDefinedValue(record.VendorInvoiceDate3, record["d:VendorInvoiceDate3"]), prev.VendorInvoiceDate3),
-        VendorInvoiceDate4: toInputDate(firstDefinedValue(record.VendorInvoiceDate4, record["d:VendorInvoiceDate4"]), prev.VendorInvoiceDate4),
-        VendorInvoiceDate5: toInputDate(firstDefinedValue(record.VendorInvoiceDate5, record["d:VendorInvoiceDate5"]), prev.VendorInvoiceDate5),
+       
         VendorInvoiceWeight: toFieldString(firstDefinedValue(record.VendorInvoiceWeight, parsedRemarks.VendorInvoiceWeight, record.GrossWeight), prev.VendorInvoiceWeight),
-        VendorInvoiceWeight2: toFieldString(record.VendorInvoiceWeight2, prev.VendorInvoiceWeight2),
-        VendorInvoiceWeight3: toFieldString(record.VendorInvoiceWeight3, prev.VendorInvoiceWeight3),
-        VendorInvoiceWeight4: toFieldString(record.VendorInvoiceWeight4, prev.VendorInvoiceWeight4),
-        VendorInvoiceWeight5: toFieldString(record.VendorInvoiceWeight5, prev.VendorInvoiceWeight5),
         BalanceQty: toFieldString(record.BalanceQty, prev.BalanceQty),
-        BalanceQty2: toFieldString(record.BalanceQty2, prev.BalanceQty2),
-        BalanceQty3: toFieldString(record.BalanceQty3, prev.BalanceQty3),
-        BalanceQty4: toFieldString(record.BalanceQty4, prev.BalanceQty4),
-        BalanceQty5: toFieldString(record.BalanceQty5, prev.BalanceQty5),
+        // Only BalanceQty is used for main Balance Quantity in this screen
+        // BalanceQty2, BalanceQty3, etc. are ignored for this field
       }));
     };
 
@@ -392,6 +432,8 @@ export default function CreateHeader() {
         setSelectedInboundRecord(hydratedRecord);
         applyFetchedRecordToHeader(hydratedRecord);
         setError(null);
+        // Clear TareWeight only ONCE after a successful fetch
+        setHeader(prev => ({ ...prev, TareWeight: "" }));
       } else {
         setSelectedInboundRecord(null);
         setError('No record found for this Vendor Invoice Number');
@@ -456,7 +498,25 @@ export default function CreateHeader() {
         WeightDocNumber: toFieldString(record.WeightDocNumber, prev.WeightDocNumber),
         GateEntryDate: toInputDate(record.HeaderGateEntryDate || record.GateEntryDate, prev.GateEntryDate),
         InwardTime: sapDurationToClock(record.InwardTime, prev.InwardTime),
-        OutwardTime: sapDurationToClock(record.HeaderOutwardTime || record.OutwardTime, prev.OutwardTime),
+        // --- Ensure GateOutDate and OutwardTime are always mapped and formatted ---
+        GateOutDate: toInputDate(
+          firstDefinedValue(
+            record.GateOutDate,
+            record.HeaderGateOutDate,
+            record["d:GateOutDate"],
+            record["d:HeaderGateOutDate"],
+            prev.GateOutDate
+          )
+        ),
+        OutwardTime: sapDurationToClock(
+          firstDefinedValue(
+            record.OutwardTime,
+            record.HeaderOutwardTime,
+            record["d:OutwardTime"],
+            record["d:HeaderOutwardTime"],
+            prev.OutwardTime
+          )
+        ),
         VehicleNumber: toFieldString(record.HeaderVehicleNumber || record.TruckNumber || record.VehicleNumber, prev.VehicleNumber),
         TransporterCode: toFieldString(record.TransporterCode, prev.TransporterCode),
         TransporterName: toFieldString(record.TransporterName, prev.TransporterName),
@@ -472,35 +532,11 @@ export default function CreateHeader() {
         GrossWeight: toFieldString(firstDefinedValue(record.GrossWeight, record.GrossWeght), prev.GrossWeight),
         NetWeight: toFieldString(firstDefinedValue(record.NetWeight, record.NetWeght), prev.NetWeight),
         PurchaseOrderNumber: toFieldString(firstDefinedValue(record.PurchaseOrderNumber, record.PurchaseOrder, record.SalesDocument), prev.PurchaseOrderNumber),
-        PurchaseOrderNumber2: toFieldString(record.PurchaseOrderNumber2, prev.PurchaseOrderNumber2),
-        PurchaseOrderNumber3: toFieldString(record.PurchaseOrderNumber3, prev.PurchaseOrderNumber3),
-        PurchaseOrderNumber4: toFieldString(record.PurchaseOrderNumber4, prev.PurchaseOrderNumber4),
-        PurchaseOrderNumber5: toFieldString(record.PurchaseOrderNumber5, prev.PurchaseOrderNumber5),
         Material: toFieldString(firstDefinedValue(record.Material, parsedRemarks.material), prev.Material),
-        Material2: toFieldString(record.Material2, prev.Material2),
-        Material3: toFieldString(record.Material3, prev.Material3),
-        Material4: toFieldString(record.Material4, prev.Material4),
-        Material5: toFieldString(record.Material5, prev.Material5),
         MaterialDescription: toFieldString(firstDefinedValue(record.MaterialDescription, parsedRemarks.grade), prev.MaterialDescription),
-        MaterialDescription2: toFieldString(record.MaterialDescription2, prev.MaterialDescription2),
-        MaterialDescription3: toFieldString(record.MaterialDescription3, prev.MaterialDescription3),
-        MaterialDescription4: toFieldString(record.MaterialDescription4, prev.MaterialDescription4),
-        MaterialDescription5: toFieldString(record.MaterialDescription5, prev.MaterialDescription5),
         Vendor: toFieldString(firstDefinedValue(record.Vendor, record.Supplier, record.Customer), prev.Vendor),
-        Vendor2: toFieldString(record.Vendor2, prev.Vendor2),
-        Vendor3: toFieldString(record.Vendor3, prev.Vendor3),
-        Vendor4: toFieldString(record.Vendor4, prev.Vendor4),
-        Vendor5: toFieldString(record.Vendor5, prev.Vendor5),
         VendorName: toFieldString(firstDefinedValue(record.VendorName, record.SupplierName, record.CustomerName), prev.VendorName),
-        VendorName2: toFieldString(record.VendorName2, prev.VendorName2),
-        VendorName3: toFieldString(record.VendorName3, prev.VendorName3),
-        VendorName4: toFieldString(record.VendorName4, prev.VendorName4),
-        VendorName5: toFieldString(record.VendorName5, prev.VendorName5),
         VendorInvoiceNumber: toFieldString(firstDefinedValue(record.VendorInvoiceNumber, record.HandInvoiceNumber, record.SalesDocument, parsedRemarks.VendorInvoiceNumber), prev.VendorInvoiceNumber),
-        VendorInvoiceNumber2: toFieldString(record.VendorInvoiceNumber2, prev.VendorInvoiceNumber2),
-        VendorInvoiceNumber3: toFieldString(record.VendorInvoiceNumber3, prev.VendorInvoiceNumber3),
-        VendorInvoiceNumber4: toFieldString(record.VendorInvoiceNumber4, prev.VendorInvoiceNumber4),
-        VendorInvoiceNumber5: toFieldString(record.VendorInvoiceNumber5, prev.VendorInvoiceNumber5),
         VendorInvoiceDate: toInputDate(
           firstDefinedValue(
             record.VendorInvoiceDate,
@@ -512,20 +548,8 @@ export default function CreateHeader() {
           ),
           prev.VendorInvoiceDate
         ),
-        VendorInvoiceDate2: toInputDate(firstDefinedValue(record.VendorInvoiceDate2, record["d:VendorInvoiceDate2"]), prev.VendorInvoiceDate2),
-        VendorInvoiceDate3: toInputDate(firstDefinedValue(record.VendorInvoiceDate3, record["d:VendorInvoiceDate3"]), prev.VendorInvoiceDate3),
-        VendorInvoiceDate4: toInputDate(firstDefinedValue(record.VendorInvoiceDate4, record["d:VendorInvoiceDate4"]), prev.VendorInvoiceDate4),
-        VendorInvoiceDate5: toInputDate(firstDefinedValue(record.VendorInvoiceDate5, record["d:VendorInvoiceDate5"]), prev.VendorInvoiceDate5),
         VendorInvoiceWeight: toFieldString(firstDefinedValue(record.VendorInvoiceWeight, parsedRemarks.VendorInvoiceWeight, record.GrossWeight), prev.VendorInvoiceWeight),
-        VendorInvoiceWeight2: toFieldString(record.VendorInvoiceWeight2, prev.VendorInvoiceWeight2),
-        VendorInvoiceWeight3: toFieldString(record.VendorInvoiceWeight3, prev.VendorInvoiceWeight3),
-        VendorInvoiceWeight4: toFieldString(record.VendorInvoiceWeight4, prev.VendorInvoiceWeight4),
-        VendorInvoiceWeight5: toFieldString(record.VendorInvoiceWeight5, prev.VendorInvoiceWeight5),
         BalanceQty: toFieldString(record.BalanceQty, prev.BalanceQty),
-        BalanceQty2: toFieldString(record.BalanceQty2, prev.BalanceQty2),
-        BalanceQty3: toFieldString(record.BalanceQty3, prev.BalanceQty3),
-        BalanceQty4: toFieldString(record.BalanceQty4, prev.BalanceQty4),
-        BalanceQty5: toFieldString(record.BalanceQty5, prev.BalanceQty5),
       }));
     };
 
@@ -775,10 +799,6 @@ export default function CreateHeader() {
       const invoiceMatched = records.filter((r) => {
         const recInvoice = normalizeToken(
           r?.VendorInvoiceNumber ||
-          r?.VendorInvoiceNumber2 ||
-          r?.VendorInvoiceNumber3 ||
-          r?.VendorInvoiceNumber4 ||
-          r?.VendorInvoiceNumber5 ||
           r?.['d:VendorInvoiceNumber'] ||
           r?.HandInvoiceNumber ||
           r?.SalesDocument
@@ -862,6 +882,29 @@ export default function CreateHeader() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // If user clears GrossWeight or TareWeight, reset NetWeight
+    if ((name === 'GrossWeight' || name === 'TareWeight') && value === '') {
+      setHeader(prev => ({
+        ...prev,
+        [name]: '',
+        NetWeight: '',
+        BalanceQty: originalBalance !== null ? originalBalance.toFixed(3) : prev.BalanceQty
+      }));
+      return;
+    }
+
+    // Prevent TareWeight > GrossWeight
+    if (name === 'TareWeight') {
+      const gross = parseFloat(header.GrossWeight);
+      const tare = parseFloat(value);
+      if (!isNaN(gross) && !isNaN(tare) && tare > gross) {
+        setError('Tare Weight cannot be greater than Gross Weight.');
+        return;
+      } else {
+        setError(null);
+      }
+    }
 
     if (name === 'GateEntryNumber') {
       setHeader((prev) => ({ ...prev, GateEntryNumber: value }));
@@ -1032,13 +1075,12 @@ export default function CreateHeader() {
     };
   }, []);
 
-  // Fetch and fill saved values from Weight Document.
-  useEffect(() => {
-    if (pageMode === 'outward') return;
 
+  // Fetch and fill saved values from Weight Document ONLY when user leaves VendorInvoiceNumber field
+  const handleVendorInvoiceBlur = () => {
+    if (pageMode === 'outward') return;
     const gateNo = String(header.GateEntryNumber || '').trim();
     if (gateNo.length >= 6) return;
-
     if (header.VendorInvoiceNumber && header.VendorInvoiceNumber.length > 0) {
       fetchWeightDocByVendorInvoice(header.VendorInvoiceNumber, {
         vehicleNumber: header.VehicleNumber,
@@ -1047,11 +1089,10 @@ export default function CreateHeader() {
         grade: header.MaterialDescription,
       });
     }
-    // Store the original BalanceQty from backend if not already set
-    if (header.BalanceQty && originalBalanceQtyRef.current === null) {
-      originalBalanceQtyRef.current = parseFloat(header.BalanceQty);
+    if (header.BalanceQty && originalBalance === null) {
+      setOriginalBalance(parseFloat(header.BalanceQty));
     }
-  }, [header.VendorInvoiceNumber, header.VehicleNumber, header.PermitNumber, header.Material, header.MaterialDescription, scanFetchTick, pageMode, header.BalanceQty]);
+  };
 
   // Direct lookup by gate entry number in outward screen.
   // Skip if selectedInboundRecord is already set — means the scan path already resolved it.
@@ -1173,12 +1214,10 @@ export default function CreateHeader() {
       // Use the correct field for UUID/guid (adjust as per SAP response)
       const weightUuid = record?.WeightSAPUUID || '';
 
-      // Always recalculate NetWeight and BalanceQty here for backend update
+      // Always recalculate NetWeight here for backend update (BalanceQty logic removed)
       const tareNum = parseFloat(header.TareWeight) || 0;
       const grossNum = parseFloat(header.GrossWeight) || 0;
       const netNum = grossNum - tareNum;
-      const originalBalance = originalBalanceQtyRef.current !== null ? originalBalanceQtyRef.current : parseFloat(header.BalanceQty) || 0;
-      const newBalance = Math.max(0, originalBalance - netNum);
 
       if (!Number.isFinite(tareNum)) {
         setError('Please enter valid Tare Weight before OUT submit.');
@@ -1204,39 +1243,50 @@ export default function CreateHeader() {
         return;
       }
 
-      // Update NetWeight and BalanceQty in state for UI consistency
+      // Update NetWeight in state for UI consistency (BalanceQty untouched)
       setHeader(prev => ({
         ...prev,
-        NetWeight: netNum.toFixed(3),
-        BalanceQty: newBalance.toFixed(3)
+        NetWeight: netNum.toFixed(3)
       }));
 
-      // Weight entity update: only outward-relevant weights.
+
+      // Always use current system date and time for OUT
+      const now = new Date();
+      // SAP expects YYYY-MM-DDT00:00:00 for date fields
+      const outwardDate = now.toISOString().split('T')[0] + 'T00:00:00';
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const outwardClock = `${hh}:${mm}:${ss}`;
+      const outwardTime = hhmmssToSapDuration(outwardClock);
+
+      // Debug: Check UUID and API call
+      console.log('Weight UUID:', weightUuid);
       if (weightUuid) {
-        await updateMaterialInward(weightUuid, {
+        const materialInwardPayload = {
           TareWeight: tareNum.toFixed(3),
           NetWeight: netNum.toFixed(3),
-        });
+          GateOutDate: outwardDate,
+          OutwardTime: outwardTime,
+          VehicleStatus: 'OUT',
+        };
+        console.log('Calling updateMaterialInward... Payload:', materialInwardPayload);
+        await updateMaterialInward(weightUuid, materialInwardPayload);
       }
 
-      const outwardDate = new Date().toISOString().split('T')[0];
-      const hh = String(new Date().getHours()).padStart(2, '0');
-      const mm = String(new Date().getMinutes()).padStart(2, '0');
-      const ss = String(new Date().getSeconds()).padStart(2, '0');
-      const outwardClock = `${hh}:${mm}:${ss}`;
-
-      // Header entity update: status, weights, balance qty, and outward timestamp fields.
-      await updateHeaderByKey(record.GateEntryNumber, {
+      // Header entity update: status, weights, and outward timestamp fields (BalanceQty untouched)
+      const headerPayload = {
         VehicleStatus: 'OUT',
         TareWeight: tareNum.toFixed(3),
         NetWeight: netNum.toFixed(3),
-        BalanceQty: newBalance.toFixed(3),
         GateOutDate: outwardDate,
-        OutwardTime: hhmmssToSapDuration(outwardClock),
-      });
+        OutwardTime: outwardTime,
+      };
+      console.log('Calling updateHeaderByKey... Payload:', headerPayload);
+      await updateHeaderByKey(record.GateEntryNumber, headerPayload);
 
       setResult(`✅ Vehicle OUT saved for Gate Entry ${record.GateEntryNumber}`);
-      setTimeout(() => resetForm(), 3000);
+      setShowSuccessModal(true);
     } catch (err) {
       console.error('Update error:', err?.response?.data || err);
       const msg = extractErrorMessage(err);
@@ -1330,216 +1380,54 @@ export default function CreateHeader() {
 
 
 
-  // Calculate NetWeight as GrossWeight - TareWeight, then update BalanceQty as original - NetWeight
-  useEffect(() => {
-    const gross = parseFloat(header.GrossWeight);
-    const tare = parseFloat(header.TareWeight);
-    const originalBalance = originalBalanceQtyRef.current !== null ? originalBalanceQtyRef.current : parseFloat(header.BalanceQty);
-    let net = '';
-    let newBalance = originalBalance;
-    if (!isNaN(gross) && !isNaN(tare)) {
-      net = gross - tare;
-      if (!isNaN(net)) {
-        newBalance = Math.max(0, originalBalance - net);
-      }
-    }
-    setHeader(prev => ({
-      ...prev,
-      NetWeight: net === '' || isNaN(net) ? '' : net.toFixed(3),
-      BalanceQty: net === '' || isNaN(net) ? prev.BalanceQty : newBalance.toFixed(3)
-    }));
-  }, [header.GrossWeight, header.TareWeight]);
+
+  // Calculate NetWeight for display only (BalanceQty is not auto-calculated)
+  const gross = parseFloat(header.GrossWeight);
+  const tare = parseFloat(header.TareWeight);
+  const net = (!isNaN(gross) && !isNaN(tare)) ? (gross - tare) : '';
+  const displayNetWeight = (net !== '' && isFinite(net)) ? net.toFixed(3) : '';
+  const displayBalanceQty = header.BalanceQty;
+
 
   return (
-    <div className="create-header-container">
-      {/* ══ ULTRA PREMIUM QR SCANNER BANNER ══ */}
-      <div style={{
-        position: 'relative',
-        borderRadius: '20px',
-        marginBottom: '32px',
-        overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 4px 20px rgba(67,255,142,0.12), inset 0 1px 0 rgba(255,255,255,0.07)',
-      }}>
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#020817 0%,#071a3e 25%,#0a2d6e 50%,#0842a0 70%,#0b5ed7 100%)' }} />
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 120% at 50% -20%,rgba(139,92,246,0.18) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(6,182,212,0.14) 0%,transparent 55%),radial-gradient(ellipse 50% 70% at 0% 100%,rgba(16,185,129,0.1) 0%,transparent 50%)' }} />
-        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(67,255,142,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(67,255,142,0.03) 1px,transparent 1px)', backgroundSize:'32px 32px' }} />
-        <div style={{ position:'absolute', top:'-40%', left:'-10%', width:'40%', height:'200%', background:'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.035) 50%,transparent 60%)', transform:'skewX(-15deg)', pointerEvents:'none' }} />
-        <div style={{ position:'absolute', right:'-8px', top:'50%', transform:'translateY(-50%)', opacity:0.045, pointerEvents:'none' }}>
-          <svg viewBox="0 0 80 80" width="108" height="108" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="10" y="10" width="10" height="10" fill="white"/>
-            <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="60" y="10" width="10" height="10" fill="white"/>
-            <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="10" y="60" width="10" height="10" fill="white"/>
-            <rect x="34" y="3" width="6" height="6" fill="white"/><rect x="42" y="3" width="6" height="6" fill="white"/>
-            <rect x="34" y="34" width="6" height="6" fill="white"/><rect x="50" y="42" width="6" height="6" fill="white"/>
-            <rect x="66" y="50" width="6" height="6" fill="white"/><rect x="66" y="66" width="6" height="6" fill="white"/>
-          </svg>
-        </div>
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:'3px', background:'linear-gradient(90deg,#8b5cf6 0%,#06b6d4 20%,#43ff8e 40%,#facc15 60%,#f97316 80%,#ec4899 100%)', boxShadow:'0 0 18px rgba(67,255,142,0.55),0 0 36px rgba(6,182,212,0.28)' }} />
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'2px', background:'linear-gradient(90deg,transparent 0%,#8b5cf6 20%,#06b6d4 40%,#43ff8e 60%,#facc15 80%,transparent 100%)', opacity:0.5 }} />
-        <div style={{ position:'absolute', top:'10px', left:'10px', width:'22px', height:'22px', borderTop:'2px solid #43ff8e', borderLeft:'2px solid #43ff8e', borderRadius:'4px 0 0 0', opacity:0.9 }} />
-        <div style={{ position:'absolute', top:'10px', right:'10px', width:'22px', height:'22px', borderTop:'2px solid #06b6d4', borderRight:'2px solid #06b6d4', borderRadius:'0 4px 0 0', opacity:0.9 }} />
-        <div style={{ position:'absolute', bottom:'10px', left:'10px', width:'22px', height:'22px', borderBottom:'2px solid #06b6d4', borderLeft:'2px solid #06b6d4', borderRadius:'0 0 0 4px', opacity:0.9 }} />
-        <div style={{ position:'absolute', bottom:'10px', right:'10px', width:'22px', height:'22px', borderBottom:'2px solid #43ff8e', borderRight:'2px solid #43ff8e', borderRadius:'0 0 4px 0', opacity:0.9 }} />
-
-        <div style={{ position:'relative', display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'center', gap:'16px', rowGap:'12px', padding:'clamp(16px, 3vw, 22px) clamp(14px, 4vw, 34px)', paddingRight:'clamp(130px, 28vw, 320px)', textAlign:'center' }}>
-          <div style={{ position:'relative', flexShrink:0, width:'72px', height:'72px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ position:'absolute', inset:'-4px', borderRadius:'18px', background:'linear-gradient(135deg,#43ff8e,#06b6d4,#8b5cf6,#43ff8e)', opacity:0.45, filter:'blur(6px)' }} />
-            <div style={{ position:'absolute', inset:0, borderRadius:'16px', padding:'2px', background:'linear-gradient(135deg,#43ff8e 0%,#06b6d4 50%,#8b5cf6 100%)' }}>
-              <div style={{ width:'100%', height:'100%', borderRadius:'14px', background:'#040e24' }} />
-            </div>
-            <div style={{ position:'relative', filter:'drop-shadow(0 0 8px rgba(67,255,142,0.8))' }}>
-              <svg viewBox="0 0 80 80" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="qOutG1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#43ff8e" />
-                    <stop offset="100%" stopColor="#06b6d4" />
-                  </linearGradient>
-                  <linearGradient id="qOutG2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#06b6d4" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                  </linearGradient>
-                </defs>
-                <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG1)" strokeWidth="4" />
-                <rect x="10" y="10" width="10" height="10" fill="url(#qOutG1)" />
-                <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG1)" strokeWidth="4" />
-                <rect x="60" y="10" width="10" height="10" fill="url(#qOutG1)" />
-                <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="url(#qOutG2)" strokeWidth="4" />
-                <rect x="10" y="60" width="10" height="10" fill="url(#qOutG2)" />
-                <rect x="34" y="3" width="6" height="6" fill="#43ff8e" /><rect x="42" y="3" width="6" height="6" fill="#06b6d4" />
-                <rect x="34" y="11" width="6" height="6" fill="#06b6d4" /><rect x="42" y="11" width="6" height="6" fill="#43ff8e" />
-                <rect x="34" y="19" width="6" height="6" fill="#8b5cf6" />
-                <rect x="3" y="34" width="6" height="6" fill="#43ff8e" /><rect x="11" y="34" width="6" height="6" fill="#06b6d4" /><rect x="19" y="34" width="6" height="6" fill="#43ff8e" />
-                <rect x="34" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="34" width="6" height="6" fill="#43ff8e" />
-                <rect x="50" y="34" width="6" height="6" fill="#06b6d4" /><rect x="58" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="34" width="6" height="6" fill="#43ff8e" />
-                <rect x="3" y="42" width="6" height="6" fill="#06b6d4" /><rect x="19" y="42" width="6" height="6" fill="#8b5cf6" />
-                <rect x="34" y="42" width="6" height="6" fill="#43ff8e" /><rect x="50" y="42" width="6" height="6" fill="#06b6d4" /><rect x="66" y="42" width="6" height="6" fill="#43ff8e" />
-                <rect x="34" y="50" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="50" width="6" height="6" fill="#06b6d4" /><rect x="58" y="50" width="6" height="6" fill="#43ff8e" />
-                <rect x="34" y="58" width="6" height="6" fill="#06b6d4" /><rect x="50" y="58" width="6" height="6" fill="#8b5cf6" />
-                <rect x="34" y="66" width="6" height="6" fill="#43ff8e" /><rect x="42" y="66" width="6" height="6" fill="#06b6d4" />
-                <rect x="58" y="66" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="58" width="6" height="6" fill="#06b6d4" /><rect x="66" y="66" width="6" height="6" fill="#43ff8e" />
-              </svg>
-            </div>
-          </div>
-
-          <div style={{ flex:1, minWidth:'220px', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
-            <div style={{
-              display:'inline-flex', alignItems:'center', gap:'6px',
-              background: pageMode === 'inward'
-                ? 'linear-gradient(90deg, rgba(67,255,142,0.18), rgba(6,182,212,0.12))'
-                : pageMode === 'outward'
-                  ? 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(139,92,246,0.12))'
-                  : 'linear-gradient(90deg, rgba(250,204,21,0.18), rgba(249,115,22,0.12))',
-              border: `1px solid ${pageMode === 'inward' ? 'rgba(67,255,142,0.5)' : pageMode === 'outward' ? 'rgba(6,182,212,0.5)' : 'rgba(250,204,21,0.5)'}`,
-              borderRadius:'30px', padding:'3px 14px', marginBottom:'8px',
-              fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase',
-              color: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
-              boxShadow: pageMode === 'inward' ? '0 0 12px rgba(67,255,142,0.2)' : pageMode === 'outward' ? '0 0 12px rgba(6,182,212,0.2)' : '0 0 12px rgba(250,204,21,0.2)',
-            }}>
-              <span style={{
-                width:'5px', height:'5px', borderRadius:'50%', flexShrink:0,
-                background: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
-                boxShadow: `0 0 6px ${pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15'}`,
-              }} />
-              {pageMode === 'inward' ? '⬇ Inward' : pageMode === 'outward' ? '⬆ Outward' : '⟳ Default'}
-            </div>
-            <h2 style={{
-              margin:0, fontSize:'clamp(1.1rem, 2.7vw, 1.7rem)', fontWeight:800,
-              fontFamily:"'Playfair Display', 'Cormorant Garamond', Georgia, serif",
-              fontStyle:'italic', letterSpacing:'0.01em', lineHeight:1.15,
-              background:'linear-gradient(90deg, #ffffff 0%, #c7f4ff 30%, #43ff8e 60%, #06b6d4 100%)',
-              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
-              filter:'drop-shadow(0 2px 12px rgba(67,255,142,0.25))',
-              wordBreak:'break-word',
-            }}>
-              {pageMode === 'inward'
-                ? 'QR Scanner — Gate Entry + Weight'
-                : pageMode === 'outward'
-                  ? 'QR Scanner — Gate Out'
-                  : 'QR Scanner — Gate Entry + Weight Document'}
-            </h2>
-            <div style={{ width:'65%', height:'1px', margin:'8px auto', background:'linear-gradient(90deg, transparent, rgba(67,255,142,0.45), rgba(6,182,212,0.45), rgba(139,92,246,0.3), transparent)' }} />
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap' }}>
-              <span style={{ color:'#94d8f8', fontWeight:500, fontSize:'0.83rem', fontFamily:"'Playfair Display', Georgia, serif", letterSpacing:'0.03em', display:'flex', alignItems:'center', gap:'5px' }}>
-                <span>📡</span>
-                Scan QR slip to auto-fill vehicle & invoice details
-              </span>
-              {/* <span style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(6,182,212,0.2))', border:'1px solid rgba(139,92,246,0.45)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#c4b5fd', fontWeight:700, letterSpacing:'0.05em', boxShadow:'0 0 8px rgba(139,92,246,0.15)' }}>
-                
-              </span> */}
-              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', background:'rgba(67,255,142,0.1)', border:'1px solid rgba(67,255,142,0.3)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#43ff8e', fontWeight:700, letterSpacing:'0.06em' }}>
-                <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#43ff8e', boxShadow:'0 0 6px #43ff8e, 0 0 10px rgba(67,255,142,0.6)', display:'inline-block' }} />
-                LIVE
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          position: 'absolute',
-          top: '0',
-          right: '0',
-          bottom: '0',
-          width: 'clamp(120px, 22vw, 240px)',
-          pointerEvents: 'none',
-          opacity: 0.94,
-          display: 'flex',
-          alignItems: 'stretch',
-          justifyContent: 'flex-end',
-          overflow: 'hidden',
-        }}>
-          <img
-            src="/ChatGPT%20Image%20Mar%2026,%202026,%2004_04_01%20PM.png"
-            alt="Scanner"
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit: 'cover',
-              objectPosition: 'right center',
-              maskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
-              WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
-            }}
-          />
-        </div>
-      </div>
-
+    <div className="create-header-container" style={{ paddingTop: 14, paddingBottom: 14 }}>
+      {/* Simple heading instead of banner */}
+      <h2 style={{ textAlign: 'center', margin: '12px 0', fontWeight: 700, fontSize: '2rem', color: '#222' }}>
+        {pageMode === 'inward'
+          ? 'QR Scanner Inward'
+          : pageMode === 'outward'
+            ? 'QR Scanner Outward'
+            : 'QR Scanner'}
+      </h2>
+      <div style={{ width:'65%', height:'1px', margin:'8px auto', background:'linear-gradient(90deg, transparent, rgba(67,255,142,0.45), rgba(6,182,212,0.45), rgba(139,92,246,0.3), transparent)' }} />
       <form onSubmit={handleSubmit} onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.type !== 'submit') {
           e.preventDefault();
         }
       }}>
-        <section className="form-section">
-          <h3 className="section-title">Header Information</h3>
+        <section className="form-section" style={{ marginBottom: 14, paddingBottom: 0 }}>
+          {/* <h3 className="section-title">Header Information</h3> */}
           <div className="grid-7-cols">
             <div className="form-group">
               <label className="form-label">Gate Entry Number (Auto)</label>
-              <input className="form-input" name="GateEntryNumber" value={header.GateEntryNumber} onChange={handleChange} placeholder="Enter or scan gate entry number" />
+              <input className="form-input" name="GateEntryNumber" value={header.GateEntryNumber} onChange={handleChange} placeholder="Enter or scan gate entry number" style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
             <div className="form-group">
               <label className="form-label">Weight Doc(Auto)</label>
-              <input className="form-input" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ background: '#f0f0f0' }} />
+              <input className="form-input" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ background: '#f0f0f0', height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
             <div className="form-group">
               <label className="form-label">Gate Entry Date *</label>
-              <input className="form-input" name="GateEntryDate" type="date" value={header.GateEntryDate} onChange={handleChange} required />
+              <input className="form-input" name="GateEntryDate" type="date" value={header.GateEntryDate} onChange={handleChange} required style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            {error && (
-              <div className="form-group full-width" style={{ marginTop: '-8px', marginBottom: '4px' }}>
-                <div className="error-message">
-                  <strong>❌ Error:</strong> {error}
-                </div>
-              </div>
-            )}
+            {/* Error is now shown below Remarks */}
 
             <div className="form-group">
               <label className="form-label">Vehicle Number *</label>
-              <input className="form-input" name="VehicleNumber" value={header.VehicleNumber} onChange={handleChange} required />
+              <input className="form-input" name="VehicleNumber" value={header.VehicleNumber} onChange={handleChange} required style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
             <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
@@ -1550,20 +1438,11 @@ export default function CreateHeader() {
                 value={header.TransporterCode}
                 onChange={handleChange}
                 onFocus={() => handleTransporterFocus('TransporterCode')}
+                style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }}
               />
               {transporterDropdown.show && transporterDropdown.field === 'TransporterCode' && (
                 <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  zIndex: 20,
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
+                  position: 'absolute',top: '100%',left: 0,right: 0,zIndex: 20,background: '#fff',border: '1px solid #e5e7eb', borderRadius: '6px',maxHeight: '220px',overflowY: 'auto',boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
                 }}>
                   {transporterDropdown.loading && (
                     <div style={{ padding: '8px 10px', color: '#555' }}>Loading...</div>
@@ -1593,21 +1472,10 @@ export default function CreateHeader() {
                 value={header.TransporterName}
                 onChange={handleChange}
                 onFocus={() => handleTransporterFocus('TransporterName')}
+                style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }}
               />
               {transporterDropdown.show && transporterDropdown.field === 'TransporterName' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  zIndex: 20,
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-                }}>
+                <div style={{position: 'absolute',top: '100%',left: 0,right: 0,zIndex: 20,background: '#fff',border: '1px solid #e5e7eb',borderRadius: '6px', maxHeight: '220px',overflowY: 'auto',boxShadow: '0 6px 16px rgba(0,0,0,0.12)'}}>
                   {transporterDropdown.loading && (
                     <div style={{ padding: '8px 10px', color: '#555' }}>Loading...</div>
                   )}
@@ -1627,178 +1495,165 @@ export default function CreateHeader() {
                 </div>
               )}
             </div>
-
             <div className="form-group">
               <label className="form-label">Driver Name</label>
-              <input className="form-input" name="DriverName" value={header.DriverName} onChange={handleChange} />
+              <input className="form-input" name="DriverName" value={header.DriverName} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Driver Phone</label>
-              <input className="form-input" name="DriverPhoneNumber" value={header.DriverPhoneNumber} onChange={handleChange} />
+              <input className="form-input" name="DriverPhoneNumber" value={header.DriverPhoneNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
-
             <div className="form-group">
               <label className="form-label">LR/GC Number</label>
-              <input className="form-input" name="LRGCNumber" value={header.LRGCNumber} onChange={handleChange} />
+              <input className="form-input" name="LRGCNumber" value={header.LRGCNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Permit Number</label>
-              <input className="form-input" name="PermitNumber" value={header.PermitNumber} onChange={handleChange} />
+              <input className="form-input" name="PermitNumber" value={header.PermitNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Sub Transporter Name</label>
-              <input className="form-input" name="SubTransporterName" value={header.SubTransporterName} onChange={handleChange} />
+              <input className="form-input" name="SubTransporterName" value={header.SubTransporterName} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
-
             <div className="form-group form-group-checkbox">
               <input type="checkbox" className="form-checkbox" name="EWayBill" checked={header.EWayBill} onChange={handleChange} />
               <label className="form-checkbox-label">E-Way Bill</label>
             </div>
-
             <div className="form-group">
               <label className="form-label">Division</label>
-              <input className="form-input" name="Division" value={header.Division} onChange={handleChange} />
+              <input className="form-input" name="Division" value={header.Division} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
             <div className="form-group">
               <label className="form-label">Inward Time</label>
-              <input className="form-input" name="InwardTime" value={header.InwardTime} readOnly />
+              <input className="form-input" name="InwardTime" value={header.InwardTime} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Outward Time</label>
-              <input className="form-input" name="OutwardTime" value={header.OutwardTime} readOnly />
+              {/* Outward Time is hidden visually but present in DOM for storing/submitting */}
+              <div style={{ display: 'none' }}>
+                <label className="form-label">Outward Time</label>
+                <input className="form-input" name="OutwardTime" value={header.OutwardTime} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
             </div>
 
             <div className="form-group full-width">
-              <label className="form-label">Remarks</label>
-              <textarea className="form-textarea" name="Remarks" value={header.Remarks} onChange={handleChange} rows={2} />
+              <label className="form-label" style={{ marginBottom: 4 }}>Remarks</label>
+              <textarea className="form-textarea" name="Remarks" value={header.Remarks} onChange={handleChange}
+                rows={2}
+                style={{
+                  minHeight: 30,
+                  height: 34,
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  backgroundColor: typeof header.Remarks === 'string' && (header.Remarks.match(/\|/g) || []).length >= 4 ? '#fffbe6' : undefined,
+                  fontWeight: typeof header.Remarks === 'string' && (header.Remarks.match(/\|/g) || []).length >= 4 ? 'bold' : undefined
+                }}
+              />
+              {error && (
+                <div style={{ color: 'red', margin: '4px 0' }}>{error}</div>
+              )}
             </div>
           </div>
         </section>
 
         <section className="form-section">
-          <h3 className="section-title">Purchase Order Details</h3>
+          {/* <h3 className="section-title">Purchase Order Details</h3> */}
           <div className="po-entry-card">
-            <h4 className="po-entry-title">PO Entry</h4>
+            {/* <h4 className="po-entry-title">PO Details</h4> */}
             <div className="grid-8-cols">
               <div className="form-group">
                 <label className="form-label">PO Number</label>
-                <input className="form-input" name="PurchaseOrderNumber" value={header["PurchaseOrderNumber"]} onChange={handleChange} />
+                <input className="form-input" name="PurchaseOrderNumber" value={header["PurchaseOrderNumber"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Material</label>
-                <input className="form-input" name="Material" value={header["Material"]} onChange={handleChange} />
+                <input className="form-input" name="Material" value={header["Material"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Material Description</label>
-                <input className="form-input" name="MaterialDescription" value={header["MaterialDescription"]} onChange={handleChange} />
+                <input className="form-input" name="MaterialDescription" value={header["MaterialDescription"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor</label>
-                <input className="form-input" name="Vendor" value={header["Vendor"]} onChange={handleChange} />
+                <input className="form-input" name="Vendor" value={header["Vendor"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor Name</label>
-                <input className="form-input" name="VendorName" value={header["VendorName"]} onChange={handleChange} />
+                <input className="form-input" name="VendorName" value={header["VendorName"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor Invoice No</label>
-                <input className="form-input" name="VendorInvoiceNumber" value={header["VendorInvoiceNumber"]} onChange={handleChange} />
+                <input className="form-input" name="VendorInvoiceNumber" value={header["VendorInvoiceNumber"]} onChange={handleChange} onBlur={handleVendorInvoiceBlur} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor Invoice Date</label>
-                <input className="form-input" type="date" name="VendorInvoiceDate" value={header["VendorInvoiceDate"]} onChange={handleChange} />
+                <input className="form-input" type="date" name="VendorInvoiceDate" value={header["VendorInvoiceDate"]} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor Invoice Weight</label>
-                <input className="form-input" name="VendorInvoiceWeight" type="text" inputMode="decimal" value={header["VendorInvoiceWeight"]} onChange={handleChange} placeholder="0.00" />
+                <input className="form-input" name="VendorInvoiceWeight" type="text" inputMode="decimal" value={header["VendorInvoiceWeight"]} onChange={handleChange} placeholder="0.00" style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Balance Quantity</label>
-                <input className="form-input" name="BalanceQty" type="text" inputMode="decimal" value={header["BalanceQty"]} onChange={handleChange} placeholder="0.000" />
+                <input className="form-input" name="BalanceQty" type="text" inputMode="decimal" value={header["BalanceQty"]} onChange={handleChange} placeholder="0.000" style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               </div>
             </div>
           </div>
         </section>
 
-        <div className="form-actions">
-          <div className="form-group" style={{ minWidth: '220px', marginBottom: 0 }}>
-            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Tare Weight (MT)</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                className="form-input"
-                name="TareWeight"
-                value={header.TareWeight}
-                onChange={handleChange}
-                placeholder="Enter or Get Tare"
-                style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
-                inputMode="decimal"
-              />
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleGetTareWeight}
-                disabled={tareWeightLoading || loading}
-                style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
-              >
-                {tareWeightLoading ? 'Getting...' : 'Get Tare'}
-              </button>
-              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
-                (You can enter manually or use Get Tare)
-              </span>
+        <div className="form-actions" style={{ padding: '8px 0', minHeight: 0, display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+          {/* Weight fields group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flex: 1, minWidth: 0 }}>
+            <div className="form-group" style={{ minWidth: '190px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>TARE WEIGHT (MT)</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', minHeight: 0 }}>
+                <input className="form-input" name="TareWeight" value={header.TareWeight === "0.000" ? "" : header.TareWeight} onChange={handleChange} placeholder="Enter or Get Tare" style={{ borderColor: '#0b5ed7', backgroundColor: '#fff', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} inputMode="decimal" />
+                <button type="button" className="btn btn-secondary" onClick={handleGetTareWeight} disabled={tareWeightLoading || loading} style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff', height: 44, minHeight: 40, fontSize: '1.18em', padding: '0 24px', fontWeight: 700 }}>{tareWeightLoading ? 'Getting...' : 'Get Tare'}</button>
+              </div>
+              <span style={{ fontSize: '0.92em', color: '#888', marginLeft: '2px', marginTop: '4px' }}></span>
+            </div>
+
+            <div className="form-group" style={{ minWidth: '160px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>GROSS WEIGHT (MT)</label>
+              <input className="form-input" name="GrossWeight" value={header.GrossWeight} onChange={handleChange} placeholder="Enter or Get Gross" style={{ borderColor: '#0b5ed7', backgroundColor: '#e0e0e0', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} inputMode="decimal" disabled />
+              <span style={{ fontSize: '0.92em', color: '#a09f9f', marginLeft: '2px', marginTop: '4px' }}></span>
+            </div>
+
+            <div className="form-group" style={{ minWidth: '160px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>NET WEIGHT (MT)</label>
+              <input className="form-input" name="NetWeight" value={displayNetWeight} readOnly placeholder="Auto-calculated" style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} />
+            </div>
+
+            <div className="form-group" style={{ minWidth: '160px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>BALANCE QUANTITY</label>
+              <input className="form-input" name="BalanceQty" value={displayBalanceQty} readOnly placeholder="Enter or fetch from backend" style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} />
             </div>
           </div>
-
-          <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
-            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Gross Weight (MT)</label>
-            <input
-              className="form-input"
-              name="GrossWeight"
-              value={header.GrossWeight}
-              onChange={handleChange}
-              placeholder="Enter or Get Gross"
-              style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
-              inputMode="decimal"
-            />
-            <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
-              (You can enter manually or use Get Gross)
-            </span>
+          {/* Action buttons group */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', minWidth: '160px' }}>
+            <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`} style={{ height: 44, minHeight: 38, fontSize: '1.08em', padding: '0 22px', marginBottom: 0, fontWeight: 700 }}>
+              {loading ? "Creating..." : "✅ Create Gate Entry + Weight Document"}
+            </button>
           </div>
-
-          <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
-            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Net Weight (MT)</label>
-            <input
-              className="form-input"
-              name="NetWeight"
-              value={header.NetWeight}
-              readOnly
-              placeholder="0.000"
-              style={{ borderColor: '#0b5ed7', backgroundColor: '#f0f0f0' }}
-            />
-          </div>
-
-          <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`}>
-            {loading ? "Creating..." : "✅ Create Gate Entry + Weight Document"}
-          </button>
-          <button type="button" onClick={resetForm} className="btn btn-secondary">Reset Form</button>
         </div>
 
       </form>
 
-      {result && (
-        <>
-          <div className="success-message">
-            <div className="success-header">
-              <svg viewBox="0 0 24 24" width="24" height="24">
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.35)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', padding: 32, minWidth: 340, maxWidth: '90vw', textAlign: 'center', position: 'relative' }}>
+            <div className="success-header" style={{marginBottom: 12}}>
+              <svg viewBox="0 0 24 24" width="32" height="32">
                 <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
               </svg>
-              <h3>Success!</h3>
+              <h3 style={{margin: 0, fontSize: '1.3em'}}>Success!</h3>
             </div>
-            <div className="success-content">
+            <div className="success-content" style={{marginBottom: 16}}>
               <p><strong>{result}</strong></p>
               {header.GateEntryNumber && (
                 <>
@@ -1809,34 +1664,72 @@ export default function CreateHeader() {
                 </>
               )}
             </div>
-            <button type="button" className="btn btn-secondary" style={{marginTop:'12px'}} onClick={handlePrintSlip}>Print Weighment Slip</button>
+            <button type="button" className="btn btn-secondary" style={{marginTop:'8px', marginRight: '8px'}} onClick={handlePrintSlip}>Download Weighment Slip</button>
+            <button type="button" className="btn btn-primary" style={{marginTop:'8px'}} onClick={() => { setShowSuccessModal(false); resetForm(); }}>OK</button>
           </div>
-          {/* Hidden printable slip template */}
-          <div id="weighment-slip-print-area" style={{display:'none'}}>
-            <div style={{fontFamily:'monospace', padding:'24px', maxWidth:'480px', margin:'0 auto'}}>
-              <h2 style={{textAlign:'center', marginBottom:'16px'}}>Weighment Slip</h2>
-              <table style={{width:'100%', fontSize:'1.1em', marginBottom:'12px'}}>
-                <tbody>
-                  <tr><td>Gate Entry No</td><td>{header.GateEntryNumber}</td></tr>
-                  <tr><td>Weight Doc No</td><td>{header.WeightDocNumber}</td></tr>
-                  <tr><td>Date</td><td>{header.GateEntryDate}</td></tr>
-                  <tr><td>Vehicle No</td><td>{header.VehicleNumber}</td></tr>
-                  <tr><td>Transporter</td><td>{header.TransporterName}</td></tr>
-                  <tr><td>Driver</td><td>{header.DriverName}</td></tr>
-                  <tr><td>PO Number</td><td>{header.PurchaseOrderNumber}</td></tr>
-                  <tr><td>Material</td><td>{header.MaterialDescription}</td></tr>
-                  <tr><td>Gross Weight (MT)</td><td>{header.GrossWeight}</td></tr>
-                  <tr><td>Tare Weight (MT)</td><td>{header.TareWeight}</td></tr>
-                  <tr><td>Net Weight (MT)</td><td>{header.NetWeight}</td></tr>
-                  <tr><td>Balance Qty (MT)</td><td>{header.BalanceQty}</td></tr>
-                  <tr><td>Remarks</td><td>{header.Remarks}</td></tr>
-                </tbody>
-              </table>
-              <div style={{textAlign:'center', marginTop:'24px', fontSize:'0.95em'}}>--- End of Slip ---</div>
-            </div>
-          </div>
-        </>
+        </div>
       )}
+      {/* Hidden printable slip template */}
+      <div id="weighment-slip-print-area" style={{display:'none'}}>
+        <div style={{fontFamily:'Arial, sans-serif', color:'#000', background:'#fff', width:'100%', maxWidth:'700px', margin:'0 auto', fontSize:'10px', padding:'18px 8px'}}>
+          {/* Removed top-left date/time and GateInWard&Outward label */}
+          <div className="minera-slip-header-row" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #000', paddingBottom: '2px', marginBottom: '4px'}}>
+            <div>
+              <div style={{fontSize: '13px', fontWeight: 'bold'}}>Minera Steel &amp; Power Pvt Ltd</div>
+              <div style={{fontSize: '9px'}}>Yerabanahalli Village, Sandur Taluk, Ballari Dist, Karnataka - 583115</div>
+            </div>
+            <img src="/Minera_Logo.jpg" alt="Minera Logo" style={{height:'35px', width:'auto', marginLeft:'8px'}} className="minera-logo-img" />
+          </div>
+          <div style={{textAlign:'center', fontSize:'12px', fontWeight:'bold', marginBottom:'4px'}}>Material Movement - Weighment Slip</div>
+          <div style={{display:'flex', flexWrap:'nowrap', gap:'32px', marginBottom:'8px', justifyContent:'space-between'}}>
+            {/* Left fields */}
+            <table style={{fontSize:'10px', minWidth:'200px'}}>
+              <tbody>
+                <tr><td><b>Weighment No</b></td><td>: {header.WeightDocNumber || '-'}</td></tr>
+                <tr><td><b>Gate Entry</b></td><td>: {header.GateEntryNumber || '-'}</td></tr>
+                <tr><td><b>Truck</b></td><td>: {header.VehicleNumber || '-'}</td></tr>
+                <tr><td><b>Party Code</b></td><td>: {header.Vendor || '-'}</td></tr>
+                <tr><td><b>Transporter<br/>Code</b></td><td>: {header.TransporterCode || '-'}</td></tr>
+                <tr><td><b>Challan Number</b></td><td>: {header.VendorInvoiceNumber || '-'}</td></tr>
+                <tr><td><b>Challan Weight</b></td><td>: {header.VendorInvoiceWeight || '-'}</td></tr>
+              </tbody>
+            </table>
+            {/* Right fields */}
+            <table style={{fontSize:'10px', minWidth:'220px'}}>
+              <tbody>
+                <tr><td><b>PO Number</b></td><td>: {header.PurchaseOrderNumber || '-'}</td></tr>
+                <tr><td><b>Product Name</b></td><td>: {header.MaterialDescription || '-'}</td></tr>
+                <tr><td><b>Party</b></td><td>: {header.VendorName || '-'}</td></tr>
+                <tr><td><b>Transporter Name</b></td><td>: {header.TransporterName || '-'}</td></tr>
+                <tr><td><b>Challan Date</b></td><td>: {header.VendorInvoiceDate || '-'}</td></tr>
+                <tr><td><b>Sub Transporter Name</b></td><td>: {header.SubTransporterName || '-'}</td></tr>
+                {/* <tr><td><b>Shift</b></td><td>:</td></tr> */}
+              </tbody>
+            </table>
+          </div>
+          <div style={{borderBottom:'1px solid #000', margin:'8px 0 6px 0'}} />
+          <div style={{display:'flex', flexWrap:'nowrap', gap:'32px', justifyContent:'space-between', marginTop:'2px'}}>
+            {/* Date/Time left */}
+            <table style={{fontSize:'10px', minWidth:'180px'}}>
+              <tbody>
+                <tr><td><b>Date In</b></td><td>: {formatDateDMY(selectedInboundRecord?.GateEntryDate || header.GateEntryDate)}</td></tr>
+                <tr><td><b>Time In</b></td><td>: {formatTimeHHMMSS(selectedInboundRecord?.InwardTime || header.InwardTime)}</td></tr>
+                <tr><td><b>Date Out</b></td><td>: {formatDateDMY(new Date())}</td></tr>
+                <tr><td><b>Time Out</b></td><td>: {formatTimeHHMMSS(new Date())}</td></tr>
+              </tbody>
+            </table>
+            {/* Weights right */}
+            <table style={{fontSize:'15px', minWidth:'200px'}}>
+              <tbody>
+                <tr><td><b>Tare</b></td><td>: {header.TareWeight || '-'} MT</td></tr>
+                <tr><td><b>Gross</b></td><td>: {header.GrossWeight || '-'} MT</td></tr>
+                <tr><td><b>Net</b></td><td>: <b>{header.NetWeight || '-'} MT</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }

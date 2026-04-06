@@ -548,7 +548,7 @@ export default function MaterialInwardOut() {
           PermitNumber: inwardRecord.PermitNumber || '',
           GateFiscalYear: inwardRecord.FiscalYear || inwardRecord.GateFiscalYear || prev.GateFiscalYear,
           FiscalYear: inwardRecord.FiscalYear || prev.FiscalYear,
-          VehicleStatus:"Out",
+          VehicleStatus:"OUT",
 
           // Gross Weight from the original record (READ-ONLY)
           GrossWeight: inwardRecord.GrossWeight || '',

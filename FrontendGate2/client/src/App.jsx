@@ -2,26 +2,32 @@ import React, { useState, useEffect, useRef } from "react";
 //import { userCrenditials } from "./api";
 import { userCrenditials } from "./api.js";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom";
+
 import InitialRegistration from  "./pages/Gateinmovementin/InitialReg.jsx";
-import QRScannerInward from "./pages/QRScanner/QRScanner.jsx";
-import QRScannerInwardOut from "./pages/QRScanner/QRScannerout.jsx"; 
 import CreateHeader from "./pages/Gateinmovementin/CreateHeader.jsx";
 import MoveINHome from "./pages/Gateinmovementin/MoveINHome.jsx";
 import MoveOutHome from "./pages/GateMovementOut/GateOutHome.jsx";
+import Outward from "./pages/Gateinmovementin/Outward.jsx";
+import GateOut_Inward from "./pages/GateMovementOut/GateEntryInward_Out.jsx";
+import GateOut_Outward from "./pages/GateMovementOut/GateEntryOutward_Out.jsx";
+
 import MaterialINHome from "./pages/MaterialMovementIN/MaterialINHome.jsx";
 import MaterialInward from "./pages/MaterialMovementIN/MaterialInward.jsx";
 import MaterialOutward from "./pages/MaterialMovementIN/MaterialOutward.jsx";
 import MaterialOutHome from "./pages/MaterialMovementOut/MaterialOutHome.jsx";  
 import MaterialOut_Inward from "./pages/MaterialMovementOut/MatInward_out.jsx";
 import MaterialOut_Outward from "./pages/MaterialMovementOut/MatOutward_out.jsx";
-import Outward from "./pages/Gateinmovementin/Outward.jsx";
-import GateOut_Inward from "./pages/GateMovementOut/GateEntryInward_Out.jsx";
-import GateOut_Outward from "./pages/GateMovementOut/GateEntryOutward_Out.jsx";
+
+import QRScannerInward from "./pages/QRScanner/QRScanner.jsx";
+import QRScannerInwardOut from "./pages/QRScanner/QRScannerout.jsx"; 
+
 import Internal_TransferPosting from "./pages/TransferPosting/emptytruckITP.jsx";
 import Loaded_TransferPosting from "./pages/TransferPosting/loadedtruckITP.jsx";
 import ITPHome from "./pages/TransferPosting/ITPHome.jsx";
 import TruckRegistration from "./pages/TransferPosting/TruckReg.jsx";
+
 import LiveDashBoard from "./pages/Gateinmovementin/LiveDashBoard.jsx";
+
 import StoreConsubale from "./pages/Gateinmovementin/StoreConsubale.jsx";
 import StoreConsubaleOut from "./pages/Gateinmovementin/StoreConsubaleOut.jsx";
 import StoresConsumableHome from "./pages/Gateinmovementin/StoresConsumableHome.jsx";
@@ -32,13 +38,16 @@ import RgpProcess from "./pages/Gateinmovementin/RgpProcess.jsx";
 import RgpGateIn from "./pages/Gateinmovementin/RgpGateIn.jsx";
 import RgpGateOut from "./pages/Gateinmovementin/RgpGateOut.jsx";
 import NrgpProcess from "./pages/Gateinmovementin/NrgpProcess.jsx";
+
 import CancelGateEntry from "./pages/Gateinmovementin/CancelGateEntry.jsx";
 import CancelWeightDocument from "./pages/Gateinmovementin/CancelWeightDocument.jsx";
 import ReprintGateEntry from "./pages/Gateinmovementin/ReprintGateEntry.jsx";
+
 import NrgpProcessHome from "./pages/Gateinmovementin/NrgpProcessHome.jsx";
 import NrgpOut from "./pages/Gateinmovementin/NrgpOut.jsx";
 //GRN Creation
 import GrnCreateByGateEntry from "./pages/ZmatGRN/zmatgrn.jsx";
+//import Reprint from "./pages/Gateinmovementin/ReprintGateEntry.jsx";
 import "./App.css";
 
 // Protected Route Component
@@ -257,6 +266,10 @@ function AutoLogout() {
   return null;
 }
 
+
+
+
+
 export default function App() {
   return (
     <Router>
@@ -265,46 +278,67 @@ export default function App() {
         <Route path="/" element={<LoginPage />} />
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         {/* 101 = admin, 102 = mm, 103 = sd */}
-        <Route path="/home/initial_registration" element={<ProtectedRoute allowedRoles={["101","102"]}><InitialRegistration /></ProtectedRoute>} />
-        <Route path="/home/create" element={<ProtectedRoute allowedRoles={["101","102"]}><CreateHeader /></ProtectedRoute>} />
-        <Route path="/home/movein" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MoveINHome /></ProtectedRoute>} />
-        <Route path="/home/moveout" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MoveOutHome /></ProtectedRoute>} />
+        <Route path="/home/initial_registration" element={<ProtectedRoute allowedRoles={["101","102","104"]}><InitialRegistration /></ProtectedRoute>} />
+        {/* Gate Entry Home Inward & Outward*/}
+        <Route path="/home/movein" element={<ProtectedRoute allowedRoles={["101","102","103","104","107"]}><MoveINHome /></ProtectedRoute>} />
+        <Route path="/home/create" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><CreateHeader /></ProtectedRoute>} />
+        <Route path="/home/movein/outward" element={<ProtectedRoute allowedRoles={["101","103","104","107"]}><Outward /></ProtectedRoute>} />
+        <Route path="/home/movein/inward" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><CreateHeader /></ProtectedRoute>} />
+        {/* Weighment1 Home Inward & Outward*/}
         <Route path="/home/materialin" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MaterialINHome /></ProtectedRoute>} />
         <Route path="/home/materialinward" element={<ProtectedRoute allowedRoles={["101","102"]}><MaterialInward /></ProtectedRoute>} />
         <Route path="/home/materialoutward" element={<ProtectedRoute allowedRoles={["101","103"]}><MaterialOutward /></ProtectedRoute>} />
+        {/* Weighment2 Home Inward & Outward*/}
         <Route path="/home/materialout" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MaterialOutHome /></ProtectedRoute>} />
         <Route path="/home/materialout_inward" element={<ProtectedRoute allowedRoles={["101","102"]}><MaterialOut_Inward /></ProtectedRoute>} />
-        <Route path="/home/movein/inward" element={<ProtectedRoute allowedRoles={["101","102"]}><CreateHeader /></ProtectedRoute>} />
-        <Route path="/home/movein/outward" element={<ProtectedRoute allowedRoles={["101","103"]}><Outward /></ProtectedRoute>} />
         <Route path="/home/materialout_outward" element={<ProtectedRoute allowedRoles={["101","103"]}><MaterialOut_Outward /></ProtectedRoute>} />
-        <Route path="/home/gateout_inward" element={<ProtectedRoute allowedRoles={["101","102"]}><GateOut_Inward /></ProtectedRoute>} />
-        <Route path="/home/gateout_outward" element={<ProtectedRoute allowedRoles={["101","103"]}><GateOut_Outward /></ProtectedRoute>} />
-        <Route path="/home/qrscanner/inward" element={<ProtectedRoute allowedRoles={["101","102"]}><QRScannerInward /></ProtectedRoute>} />
-        <Route path="/home/qrscanner/outward" element={<ProtectedRoute allowedRoles={["101","102"]}><QRScannerInwardOut /></ProtectedRoute>} />
-        <Route path="/home/transferposting/itp" element={<ProtectedRoute allowedRoles={["101","103"]}><Internal_TransferPosting /></ProtectedRoute>} />
-        <Route path="/home/transferposting/loadeditp" element={<ProtectedRoute allowedRoles={["101","103"]}><Loaded_TransferPosting /></ProtectedRoute>} />
-        <Route path="/home/transferposting" element={<ProtectedRoute allowedRoles={["101","103"]}><ITPHome /></ProtectedRoute>} />
-        <Route path="/home/truckregistration" element={<ProtectedRoute allowedRoles={["101","103"]}><TruckRegistration /></ProtectedRoute>} />
-        <Route path="/home/storeconsumable" element={<ProtectedRoute allowedRoles={["101","102"]}><StoresConsumableHome /></ProtectedRoute>} />
-        <Route path="/stores-consumable-entry" element={<ProtectedRoute allowedRoles={["101","102"]}><StoreConsubale /></ProtectedRoute>} />
-        <Route path="/stores-consumable-outward" element={<ProtectedRoute allowedRoles={["101","102"]}><StoreConsubaleOut /></ProtectedRoute>} />
-        <Route path="/gate-entry-outward" element={<ProtectedRoute allowedRoles={["101","103"]}><GateOut_Outward /></ProtectedRoute>} />
+        {/* Complete Gate Out Inward&Outward */}
+        <Route path="/home/moveout" element={<ProtectedRoute allowedRoles={["101","102","103","104","107"]}><MoveOutHome /></ProtectedRoute>} />
+        <Route path="/home/gateout_inward" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><GateOut_Inward /></ProtectedRoute>} />
+        <Route path="/home/gateout_outward" element={<ProtectedRoute allowedRoles={["101","103","104","107"]}><GateOut_Outward /></ProtectedRoute>} />
+
+        {/* QR Scanner Routes Pallet */}
+        <Route path="/home/qrscanner/inward" element={<ProtectedRoute allowedRoles={["101","102","107"]}><QRScannerInward /></ProtectedRoute>} />
+        <Route path="/home/qrscanner/outward" element={<ProtectedRoute allowedRoles={["101","102","107"]}><QRScannerInwardOut /></ProtectedRoute>} />
+
+        {/* Transfer Posting Routes Pallet */}
+        <Route path="/home/transferposting" element={<ProtectedRoute allowedRoles={["101","103","107","108"]}><ITPHome /></ProtectedRoute>} />
+        <Route path="/home/truckregistration" element={<ProtectedRoute allowedRoles={["101","103","108"]}><TruckRegistration /></ProtectedRoute>} />
+        <Route path="/home/transferposting/itp" element={<ProtectedRoute allowedRoles={["101","103","107"]}><Internal_TransferPosting /></ProtectedRoute>} />
+        <Route path="/home/transferposting/loadeditp" element={<ProtectedRoute allowedRoles={["101","103","107"]}><Loaded_TransferPosting /></ProtectedRoute>} />
+        
+
+        {/* Stores and Consumable Routes */}
+        <Route path="/home/storeconsumable" element={<ProtectedRoute allowedRoles={["101","102","104"]}><StoresConsumableHome /></ProtectedRoute>} />
+        <Route path="/stores-consumable-entry" element={<ProtectedRoute allowedRoles={["101","102","104"]}><StoreConsubale /></ProtectedRoute>} />
+        <Route path="/stores-consumable-outward" element={<ProtectedRoute allowedRoles={["101","102","104"]}><StoreConsubaleOut /></ProtectedRoute>} />
+
+        <Route path="/gate-entry-outward" element={<ProtectedRoute allowedRoles={["101","103","104"]}><GateOut_Outward /></ProtectedRoute>} />
         <Route path="/home/livedashboard" element={<ProtectedRoute allowedRoles={["101","102","103"]}><LiveDashBoard /></ProtectedRoute>} />
-                <Route path="/home/cashpurchase" element={<ProtectedRoute allowedRoles={["101","102","103"]}><CashPurchaseScreen /></ProtectedRoute>} />
-                <Route path="/home/rgp" element={<ProtectedRoute allowedRoles={["101","102"]}><RgpNrgpHome /></ProtectedRoute>} />
-                <Route path="/home/rgp/process" element={<ProtectedRoute allowedRoles={["101","102"]}><RgpProcessHome /></ProtectedRoute>} />
-                <Route path="/home/rgp/process/entry" element={<ProtectedRoute allowedRoles={["101","102"]}><RgpProcess /></ProtectedRoute>} />
-                <Route path="/home/rgp/process/gate-out" element={<ProtectedRoute allowedRoles={["101","102"]}><RgpGateOut /></ProtectedRoute>} />
-                <Route path="/home/rgp/process/gate-in" element={<ProtectedRoute allowedRoles={["101","102"]}><RgpGateIn /></ProtectedRoute>} />
-                <Route path="/home/nrgp/process" element={<ProtectedRoute allowedRoles={["101","102"]}><NrgpProcessHome /></ProtectedRoute>} />
-                <Route path="/home/nrgp/process/entry" element={<ProtectedRoute allowedRoles={["101","102"]}><NrgpProcess /></ProtectedRoute>} />
-                <Route path="/home/nrgp/process/gate-out" element={<ProtectedRoute allowedRoles={["101","102"]}><NrgpOut /></ProtectedRoute>} />
+
+        {/* Cash Purchase and RGP/NRGP Routes */}
+                <Route path="/home/cashpurchase" element={<ProtectedRoute allowedRoles={["101","102","104"]}><CashPurchaseScreen /></ProtectedRoute>} />
+                {/* RGP/NRGP Home*/}
+                <Route path="/home/rgp" element={<ProtectedRoute allowedRoles={["101","102","104","110"]}><RgpNrgpHome /></ProtectedRoute>} />
+                {/* RGP/NRGP Two Homes */}
+                <Route path="/home/nrgp/process" element={<ProtectedRoute allowedRoles={["101","102","110","104"]}><NrgpProcessHome /></ProtectedRoute>} />
+                <Route path="/home/rgp/process" element={<ProtectedRoute allowedRoles={["101","102","110","104"]}><RgpProcessHome /></ProtectedRoute>} />
+
+                <Route path="/home/rgp/process/entry" element={<ProtectedRoute allowedRoles={["101","102","110"]}><RgpProcess /></ProtectedRoute>} />
+                <Route path="/home/rgp/process/gate-out" element={<ProtectedRoute allowedRoles={["101","102","104"]}><RgpGateOut /></ProtectedRoute>} />
+                <Route path="/home/rgp/process/gate-in" element={<ProtectedRoute allowedRoles={["101","102","104"]}><RgpGateIn /></ProtectedRoute>} />
+                <Route path="/home/nrgp/process/entry" element={<ProtectedRoute allowedRoles={["101","102","110"]}><NrgpProcess /></ProtectedRoute>} />
+                <Route path="/home/nrgp/process/gate-out" element={<ProtectedRoute allowedRoles={["101","102","104"]}><NrgpOut /></ProtectedRoute>} />
+
+
         {/* Cancel Gate Entry */}
-        <Route path="/home/cancel-gate-entry" element={<ProtectedRoute allowedRoles={["101","102"]}><CancelGateEntry /></ProtectedRoute>} />
-        <Route path="/home/cancel-weight-doc" element={<ProtectedRoute allowedRoles={["101","102"]}><CancelWeightDocument /></ProtectedRoute>} />
-        <Route path="/home/reprint" element={<ProtectedRoute allowedRoles={["101","102","103"]}><ReprintGateEntry /></ProtectedRoute>} />
+        <Route path="/home/cancel-gate-entry" element={<ProtectedRoute allowedRoles={["101","104"]}><CancelGateEntry /></ProtectedRoute>} />
+        <Route path="/home/cancel-weight-doc" element={<ProtectedRoute allowedRoles={["101","104"]}><CancelWeightDocument /></ProtectedRoute>} />
+        <Route path="/home/reprint" element={<ProtectedRoute allowedRoles={["101","104"]}><ReprintGateEntry /></ProtectedRoute>} />
         {/* GRN Creation */}
-        <Route path="/home/grncreate" element={<ProtectedRoute allowedRoles={["101","102"]}><GrnCreateByGateEntry /></ProtectedRoute>} />
+        <Route path="/home/grncreate" element={<ProtectedRoute allowedRoles={["101","102","110"]}><GrnCreateByGateEntry /></ProtectedRoute>} />
+
+
       </Routes>
     </Router>
   );

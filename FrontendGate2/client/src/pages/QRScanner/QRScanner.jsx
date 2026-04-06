@@ -1,9 +1,11 @@
 // Version 6 - Create Gate Entry + Material Inward (Weight Document) together
 import React, { useState, useEffect, useRef } from "react";
-import { createHeader, createMaterialInward, sendEmailNotification, fetchPurchaseOrderByPermitNumber, fetchPurchaseOrderByNumber, transporterDetails, fetchPelletInWeightFromBridge, fetchGateEntryByNumber, fetchWeightDetailsByVendorInvoiceNumber } from "../../api";
+import { createHeader, createMaterialInward, sendEmailNotification, fetchPurchaseOrderByPermitNumber, fetchPurchaseOrderByNumber, transporterDetails, fetchPelletInWeightFromBridge, fetchGateEntryByNumber, fetchWeightDetailsByVendorInvoiceNumber, fetchQRWeightmentSummary } from "../../api";
 import { useLocation } from "react-router-dom";
 
+
 export default function CreateHeader() {
+ 
   // Financial year rule: Apr-Mar maps to ending year (e.g. FY 2025-26 => 2026).
   const getFiscalYear = (dateLike) => {
     if (!dateLike) return String(new Date().getFullYear());
@@ -13,9 +15,6 @@ export default function CreateHeader() {
     const year = d.getFullYear();
     return String(month >= 3 ? year + 1 : year);
   };
-
-  const currentDate = new Date().toISOString().split('T')[0];
-  const currentYear = getFiscalYear(currentDate);
 
   // Helper: Format current time into SAP duration string e.g. PT16H42M16S
   const formatTimeToSapDuration = (date = new Date()) => {
@@ -27,6 +26,8 @@ export default function CreateHeader() {
 
   // Helper: Full ISO timestamp (UTC) for SAP_CreatedDateTime
   const nowIso = (date = new Date()) => date.toISOString();
+  const currentDate = new Date().toISOString().split('T')[0];
+  const currentYear = getFiscalYear(currentDate);
 
   // Create initial state function to avoid reference issues
   const createInitialHeaderState = () => {
@@ -54,7 +55,6 @@ export default function CreateHeader() {
         ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}:${new Date().getSeconds().toString().padStart(2, '0')}`
         : '',
       SAP_CreatedDateTime: new Date().toISOString(),
-      
       // Weight Bridge fields (NEW)
       WeightDocNumber: "",
       GrossWeight: "",
@@ -76,7 +76,6 @@ export default function CreateHeader() {
     }
     // Add BalanceQty3 for PO Quantity (if not already present)
     if (!initialState.BalanceQty3) initialState.BalanceQty3 = "";
-
     return initialState;
   };
 
@@ -108,7 +107,6 @@ export default function CreateHeader() {
       payload?.items?.[0]?.PurchasingProcessingStatus ||
       ''
     ).trim().toUpperCase();
-
     return status === '05' || status === 'APPROVED';
   };
 
@@ -123,7 +121,7 @@ export default function CreateHeader() {
       return;
     }
 
-    if (name.includes('VendorInvoiceWeight') || name.includes('BalanceQty') || name === 'GrossWeight') {
+    if (name === 'VendorInvoiceWeight' || name === 'BalanceQty') {
       if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
         setHeader(prev => ({ ...prev, [name]: value }));
       }
@@ -177,9 +175,6 @@ export default function CreateHeader() {
     setTransporterDropdown(prev => ({ ...prev, show: false }));
   };
 
-
-
-  // Keep fiscal year in sync with gate entry date.
   useEffect(() => {
     if (header.GateEntryDate) {
       const year = getFiscalYear(header.GateEntryDate);
@@ -256,10 +251,6 @@ export default function CreateHeader() {
         const matchingWeights = (Array.isArray(weightResults) ? weightResults : []).filter((record) => {
           const recordMdp = String(
             record?.VendorInvoiceNumber ||
-            record?.VendorInvoiceNumber2 ||
-            record?.VendorInvoiceNumber3 ||
-            record?.VendorInvoiceNumber4 ||
-            record?.VendorInvoiceNumber5 ||
             ''
           ).trim();
           return recordMdp === mdpNumber;
@@ -317,6 +308,9 @@ export default function CreateHeader() {
     const poNumber = String(header.PurchaseOrderNumber || '').trim();
     if (poNumber.length < 5) {
       setPoApprovalError(null);
+      setHeader(prev => ({ ...prev,
+        Division: '', Material: '', MaterialDescription: '', Vendor: '', VendorName: '', BalanceQty3: '',
+      }));
       return;
     }
 
@@ -328,143 +322,53 @@ export default function CreateHeader() {
     poLookupTimeoutRef.current = setTimeout(async () => {
       if (cancelled) return;
       try {
-        // 1. Fetch PO details for approval and material info
-        const resp = await fetchPurchaseOrderByNumber(poNumber);
-
-        if (!isPurchaseOrderApproved(resp?.data)) {
-          if (!cancelled) {
-            setPoApprovalError(`PO ${poNumber} is not approved.`);
-            setHeader(prev => (
-              prev.PurchaseOrderNumber === poNumber
-                ? {
-                    ...prev,
-                    Division: '',
-                    Material: '',
-                    MaterialDescription: '',
-                    BalanceQty: ''
-                  }
-                : prev
-            ));
-          }
-          return;
-        }
-
-        if (!cancelled) {
-          setPoApprovalError(null);
-        }
-
-        const items =
-          resp?.data?.items ||
-          resp?.data?.d?.results ||
-          resp?.data?.value ||
-          [];
+        // Fetch PO details
+        const poResp = await fetchPurchaseOrderByNumber(poNumber);
+        const items = poResp?.data?.items || poResp?.data?.d?.results || poResp?.data?.value || [];
         const firstItem = items[0] || {};
-        const plant =
-          firstItem.Plant ||
-          firstItem.plant ||
-          firstItem.ReceivingPlant ||
-          firstItem.SupplyingPlant ||
-          resp?.data?.Plant ||
-          resp?.data?.plant ||
-          '';
-
-        const poMaterial =
-          firstItem.Material ||
-          firstItem["d:Material"] ||
-          resp?.data?.Material ||
-          resp?.data?.["d:Material"] ||
-          '';
-
-        const poMaterialDescription =
-          firstItem.ProductDescription ||
-          firstItem.MaterialDescription ||
-          firstItem.productDescription ||
-          firstItem["d:ProductDescription"] ||
-          firstItem["d:MaterialDescription"] ||
-          resp?.data?.ProductDescription ||
-          resp?.data?.MaterialDescription ||
-          resp?.data?.d?.ProductDescription ||
-          resp?.data?.["d:ProductDescription"] ||
-          resp?.data?.["d:MaterialDescription"] ||
-          '';
-
-        // 2. Fetch all Gate Entries for this PO from OData (backend API)
-        // Use OData $filter for PurchaseOrderNumber eq 'poNumber'
-        // The backend route is /headers?filter=...
-        // Use fetchGateEntryByNumber with a custom filter
-        const safePo = escapeODataValue(poNumber);
-        const filter = `$filter=PurchaseOrderNumber eq '${safePo}'&$format=json`;
-        const gateResp = await fetchGateEntryByNumber(filter);
-        const gateResults = gateResp?.data?.d?.results || gateResp?.data?.value || [];
-
-        // 3. Sort by GateEntryDate desc, InwardTime desc
-        const parseDate = (d) => {
-          if (!d) return 0;
-          if (typeof d === 'string' && d.length >= 10) return new Date(d).getTime();
-          return 0;
-        };
-        const parseTime = (t) => {
-          if (!t) return 0;
-          // SAP duration: PT16H40M06S or HH:MM:SS
-          if (typeof t === 'string' && t.startsWith('PT')) {
-            const m = t.match(/PT(\d+)H(\d+)M(\d+)S/);
-            if (m) return Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]);
+        // Fetch finalBalance from backend (like QRScannerout)
+        let finalBalance = '';
+        try {
+          const qrWeightResp = await fetchQRWeightmentSummary(poNumber);
+          finalBalance = qrWeightResp?.data?.finalBalance;
+        } catch (e) {
+          finalBalance = '';
+        }
+        setHeader(prev => {
+          if (prev.PurchaseOrderNumber !== poNumber) return prev;
+          // Try all possible keys for Material Description
+          const materialDescription =
+            firstItem.MaterialDescription ||
+            firstItem.ProductDescription ||
+            firstItem.materialDescription ||
+            firstItem.productDescription ||
+            prev.MaterialDescription;
+          // Always store BalanceQty as positive value
+          let absFinalBalance = finalBalance;
+          if (absFinalBalance !== undefined && absFinalBalance !== null && !isNaN(absFinalBalance)) {
+            absFinalBalance = Math.abs(Number(absFinalBalance)).toFixed(3);
+          } else {
+            absFinalBalance = prev.BalanceQty;
           }
-          if (typeof t === 'string' && t.match(/^\d{2}:\d{2}:\d{2}$/)) {
-            const [h,m,s] = t.split(':').map(Number); return h*3600+m*60+s;
-          }
-          return 0;
-        };
-        const sorted = [...gateResults].sort((a, b) => {
-          const dateA = parseDate(a.GateEntryDate || a["d:GateEntryDate"]);
-          const dateB = parseDate(b.GateEntryDate || b["d:GateEntryDate"]);
-          if (dateA !== dateB) return dateB - dateA;
-          const timeA = parseTime(a.InwardTime || a["d:InwardTime"]);
-          const timeB = parseTime(b.InwardTime || b["d:InwardTime"]);
-          return timeB - timeA;
+          return {
+            ...prev,
+            Division: firstItem.Plant || firstItem.ReceivingPlant || firstItem.SupplyingPlant || prev.Division,
+            Material: firstItem.Material || prev.Material,
+            MaterialDescription: materialDescription,
+            Vendor: firstItem.Vendor || prev.Vendor,
+            VendorName: firstItem.VendorName || prev.VendorName,
+            BalanceQty3: firstItem.OrderQuantity || '', // PO Quantity
+            BalanceQty: absFinalBalance,
+          };
         });
-
-        // 4. Find latest valid (Status is Success or null/empty, not CANCELLED)
-        const normalizeStatus = (v) => String(v || '').trim().toUpperCase();
-        let latestValid = null;
-        for (const entry of sorted) {
-          const status = normalizeStatus(entry.Status || entry["d:Status"]);
-          if (status === 'CANCELLED') continue;
-          if (status === 'SUCCESS' || status === '' || status === 'NULL' || status === null) {
-            latestValid = entry;
-            break;
-          }
-        }
-
-        // 5. Get BalanceQty from latest valid entry
-        let balanceQty = '';
-        if (latestValid) {
-          balanceQty = latestValid.BalanceQty || latestValid["d:BalanceQty"] || '';
-        } else {
-          // Fallback: use PO quantity if available
-          balanceQty = firstItem.OrderQuantity || firstItem.Quantity || firstItem.BalanceQty || '';
-        }
-
-        // 6. Update header state with all info
-        if (!cancelled) {
-          setHeader(prev => {
-            if (prev.PurchaseOrderNumber !== poNumber) return prev;
-            return {
-              ...prev,
-              Division: plant || prev.Division,
-              Material: poMaterial || prev.Material,
-              MaterialDescription: poMaterialDescription || prev.MaterialDescription,
-              BalanceQty: balanceQty || '',
-              BalanceQty3: (firstItem.OrderQuantity || firstItem.Quantity || prev.BalanceQty3 || '')
-            };
-          });
-        }
+        setPoApprovalError(null);
       } catch (err) {
-        if (err?.response?.status !== 404) {
-          console.warn('Unable to fetch PO or GateEntry for PO', poNumber, err);
-        }
+        setPoApprovalError('Failed to fetch PO details');
+        setHeader(prev => ({ ...prev,
+          Division: '', Material: '', MaterialDescription: '', Vendor: '', VendorName: '', BalanceQty3: '', BalanceQty: '',
+        }));
       }
-    }, 300);
+    }, 400);
 
     return () => {
       cancelled = true;
@@ -473,6 +377,32 @@ export default function CreateHeader() {
       }
     };
   }, [header.PurchaseOrderNumber]);
+
+  // Effect: When PO Quantity is set, fetch totalNetWeight and update BalanceQty
+  useEffect(() => {
+    const poNumber = String(header.PurchaseOrderNumber || '').trim();
+    const poQtyStr = header.BalanceQty3;
+    const poQty = parseFloat(poQtyStr);
+    if (!poNumber || !poQtyStr || isNaN(poQty)) {
+      setHeader(prev => ({ ...prev, BalanceQty: '0.000' }));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const qrResp = await fetchQRWeightmentSummary(poNumber);
+        const totalNetWeightStr = qrResp?.data?.totalNetWeight || '0';
+        const totalNetWeight = parseFloat(totalNetWeightStr) || 0;
+        const balanceQty = poQty - totalNetWeight;
+        if (!cancelled) {
+          setHeader(prev => ({ ...prev, BalanceQty: balanceQty.toFixed(3) }));
+        }
+      } catch {
+        if (!cancelled) setHeader(prev => ({ ...prev, BalanceQty: '0.000' }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [header.PurchaseOrderNumber, header.BalanceQty3]);
 
   useEffect(() => {
     const closeDropdown = () => {
@@ -637,6 +567,15 @@ export default function CreateHeader() {
       }
 
       let updatedHeader = { ...header };
+      // Correct calculation for BalanceQty: BalanceQty = previous BalanceQty - VendorInvoiceWeight
+      const viw = parseFloat(updatedHeader.VendorInvoiceWeight) || 0;
+      const prevBalance = parseFloat(updatedHeader.BalanceQty) || 0;
+
+      // Correct calculation
+      let newBalance = prevBalance - viw;
+      // Prevent negative
+      if (newBalance < 0) newBalance = 0;
+      updatedHeader.BalanceQty = newBalance.toFixed(3);
 
       const inbound = updatedHeader.InwardTime || `${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')}:${new Date().getSeconds().toString().padStart(2,'0')}`;
       const outbound = updatedHeader.OutwardTime || inbound;
@@ -679,11 +618,7 @@ export default function CreateHeader() {
         const resolvedTruckCapacity =
           String(updatedHeader.TruckCapacity || '').trim() ||
           String(updatedHeader.GrossWeight || '').trim() ||
-          String(updatedHeader.VendorInvoiceWeight || '').trim() ||
-          String(updatedHeader.VendorInvoiceWeight2 || '').trim() ||
-          String(updatedHeader.VendorInvoiceWeight3 || '').trim() ||
-          String(updatedHeader.VendorInvoiceWeight4 || '').trim() ||
-          String(updatedHeader.VendorInvoiceWeight5 || '').trim();
+          String(updatedHeader.VendorInvoiceWeight || '').trim();
 
         const weightPayload = {
           WeightDocNumber: updatedHeader.WeightDocNumber,
@@ -700,47 +635,17 @@ export default function CreateHeader() {
           SAP_CreatedDateTime: nowIso(),
           // Copy PO fields (same as before)
           PurchaseOrderNumber: updatedHeader.PurchaseOrderNumber || null,
-          PurchaseOrderNumber2: updatedHeader.PurchaseOrderNumber2 || null,
-          PurchaseOrderNumber3: updatedHeader.PurchaseOrderNumber3 || null,
-          PurchaseOrderNumber4: updatedHeader.PurchaseOrderNumber4 || null,
-          PurchaseOrderNumber5: updatedHeader.PurchaseOrderNumber5 || null,
           Material: updatedHeader.Material || null,
-          Material2: updatedHeader.Material2 || null,
-          Material3: updatedHeader.Material3 || null,
-          Material4: updatedHeader.Material4 || null,
-          Material5: updatedHeader.Material5 || null,
           MaterialDescription: updatedHeader.MaterialDescription || null,
-          MaterialDescription2: updatedHeader.MaterialDescription2 || null,
-          MaterialDescription3: updatedHeader.MaterialDescription3 || null,
-          MaterialDescription4: updatedHeader.MaterialDescription4 || null,
-          MaterialDescription5: updatedHeader.MaterialDescription5 || null,
           Vendor: updatedHeader.Vendor || null,
-          Vendor2: updatedHeader.Vendor2 || null,
-          Vendor3: updatedHeader.Vendor3 || null,
-          Vendor4: updatedHeader.Vendor4 || null,
-          Vendor5: updatedHeader.Vendor5 || null,
           VendorName: updatedHeader.VendorName || null,
-          VendorName2: updatedHeader.VendorName2 || null,
-          VendorName3: updatedHeader.VendorName3 || null,
-          VendorName4: updatedHeader.VendorName4 || null,
-          VendorName5: updatedHeader.VendorName5 || null,
           VendorInvoiceNumber: updatedHeader.VendorInvoiceNumber || null,
-          VendorInvoiceNumber2: updatedHeader.VendorInvoiceNumber2 || null,
-          VendorInvoiceNumber3: updatedHeader.VendorInvoiceNumber3 || null,
-          VendorInvoiceNumber4: updatedHeader.VendorInvoiceNumber4 || null,
-          VendorInvoiceNumber5: updatedHeader.VendorInvoiceNumber5 || null,
           VendorInvoiceWeight: (String(updatedHeader.VendorInvoiceWeight || '').trim() !== ''
             ? updatedHeader.VendorInvoiceWeight
             : updatedHeader.GrossWeight) || null,
-          VendorInvoiceWeight2: updatedHeader.VendorInvoiceWeight2 || null,
-          VendorInvoiceWeight3: updatedHeader.VendorInvoiceWeight3 || null,
-          VendorInvoiceWeight4: updatedHeader.VendorInvoiceWeight4 || null,
-          VendorInvoiceWeight5: updatedHeader.VendorInvoiceWeight5 || null,
           BalanceQty: updatedHeader.BalanceQty || null,
-          BalanceQty2: updatedHeader.BalanceQty2 || null,
           BalanceQty3: updatedHeader.BalanceQty3 || null,
-          BalanceQty4: updatedHeader.BalanceQty4 || null,
-          BalanceQty5: updatedHeader.BalanceQty5 || null,
+
         };
 
         // Handle VendorInvoiceDate fields
@@ -867,455 +772,252 @@ export default function CreateHeader() {
     }
   }, [header.Remarks]);
 
+
   return (
-    <div className="create-header-container">
-      {/* ══ ULTRA PREMIUM QR SCANNER BANNER ══ */}
-      <div style={{
-        position: 'relative',
-        borderRadius: '20px',
-        marginBottom: '32px',
-        overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 4px 20px rgba(67,255,142,0.12), inset 0 1px 0 rgba(255,255,255,0.07)',
-      }}>
-        {/* Deep layered background */}
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#020817 0%,#071a3e 25%,#0a2d6e 50%,#0842a0 70%,#0b5ed7 100%)' }} />
-        {/* Aurora sweep — purple + teal + emerald */}
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 120% at 50% -20%,rgba(139,92,246,0.18) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(6,182,212,0.14) 0%,transparent 55%),radial-gradient(ellipse 50% 70% at 0% 100%,rgba(16,185,129,0.1) 0%,transparent 50%)' }} />
-        {/* Subtle grid mesh */}
-        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(67,255,142,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(67,255,142,0.03) 1px,transparent 1px)', backgroundSize:'32px 32px' }} />
-        {/* Diagonal shimmer streak */}
-        <div style={{ position:'absolute', top:'-40%', left:'-10%', width:'40%', height:'200%', background:'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.035) 50%,transparent 60%)', transform:'skewX(-15deg)', pointerEvents:'none' }} />
-        {/* Ghost QR watermark right side */}
-        <div style={{ position:'absolute', right:'-8px', top:'50%', transform:'translateY(-50%)', opacity:0.045, pointerEvents:'none' }}>
-          <svg viewBox="0 0 80 80" width="108" height="108" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="10" y="10" width="10" height="10" fill="white"/>
-            <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="60" y="10" width="10" height="10" fill="white"/>
-            <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="white" strokeWidth="4"/>
-            <rect x="10" y="60" width="10" height="10" fill="white"/>
-            <rect x="34" y="3" width="6" height="6" fill="white"/><rect x="42" y="3" width="6" height="6" fill="white"/>
-            <rect x="34" y="34" width="6" height="6" fill="white"/><rect x="50" y="42" width="6" height="6" fill="white"/>
-            <rect x="66" y="50" width="6" height="6" fill="white"/><rect x="66" y="66" width="6" height="6" fill="white"/>
-          </svg>
-        </div>
-        {/* Rainbow prismatic top bar */}
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:'3px', background:'linear-gradient(90deg,#8b5cf6 0%,#06b6d4 20%,#43ff8e 40%,#facc15 60%,#f97316 80%,#ec4899 100%)', boxShadow:'0 0 18px rgba(67,255,142,0.55),0 0 36px rgba(6,182,212,0.28)' }} />
-        {/* Bottom shimmer bar */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'2px', background:'linear-gradient(90deg,transparent 0%,#8b5cf6 20%,#06b6d4 40%,#43ff8e 60%,#facc15 80%,transparent 100%)', opacity:0.5 }} />
-        {/* Corner brackets — alternating green + cyan */}
-        <div style={{ position:'absolute', top:'10px', left:'10px', width:'22px', height:'22px', borderTop:'2px solid #43ff8e', borderLeft:'2px solid #43ff8e', borderRadius:'4px 0 0 0', boxShadow:'0 0 8px rgba(67,255,142,0.5)', opacity:0.9 }} />
-        <div style={{ position:'absolute', top:'10px', right:'10px', width:'22px', height:'22px', borderTop:'2px solid #06b6d4', borderRight:'2px solid #06b6d4', borderRadius:'0 4px 0 0', boxShadow:'0 0 8px rgba(6,182,212,0.5)', opacity:0.9 }} />
-        <div style={{ position:'absolute', bottom:'10px', left:'10px', width:'22px', height:'22px', borderBottom:'2px solid #06b6d4', borderLeft:'2px solid #06b6d4', borderRadius:'0 0 0 4px', boxShadow:'0 0 8px rgba(6,182,212,0.5)', opacity:0.9 }} />
-        <div style={{ position:'absolute', bottom:'10px', right:'10px', width:'22px', height:'22px', borderBottom:'2px solid #43ff8e', borderRight:'2px solid #43ff8e', borderRadius:'0 0 4px 0', boxShadow:'0 0 8px rgba(67,255,142,0.5)', opacity:0.9 }} />
-
-        {/* ── Main content row ── */}
-        <div style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', gap:'22px', padding:'22px 44px', paddingRight:'clamp(130px, 28vw, 320px)', textAlign:'center' }}>
-          {/* QR icon with glowing ring */}
-            <div style={{ position:'relative', flexShrink:0, width:'72px', height:'72px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <div style={{ position:'absolute', inset:'-4px', borderRadius:'18px', background:'linear-gradient(135deg,#43ff8e,#06b6d4,#8b5cf6,#43ff8e)', opacity:0.45, filter:'blur(6px)' }} />
-              <div style={{ position:'absolute', inset:0, borderRadius:'16px', padding:'2px', background:'linear-gradient(135deg,#43ff8e 0%,#06b6d4 50%,#8b5cf6 100%)' }}>
-                <div style={{ width:'100%', height:'100%', borderRadius:'14px', background:'#040e24' }} />
-              </div>
-              <div style={{ position:'relative', filter:'drop-shadow(0 0 8px rgba(67,255,142,0.8))' }}>
-                <svg viewBox="0 0 80 80" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="qG1" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#43ff8e" />
-                      <stop offset="100%" stopColor="#06b6d4" />
-                    </linearGradient>
-                    <linearGradient id="qG2" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#06b6d4" />
-                      <stop offset="100%" stopColor="#8b5cf6" />
-                    </linearGradient>
-                  </defs>
-                  <rect x="3" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qG1)" strokeWidth="4" />
-                  <rect x="10" y="10" width="10" height="10" fill="url(#qG1)" />
-                  <rect x="53" y="3" width="24" height="24" rx="3" fill="none" stroke="url(#qG1)" strokeWidth="4" />
-                  <rect x="60" y="10" width="10" height="10" fill="url(#qG1)" />
-                  <rect x="3" y="53" width="24" height="24" rx="3" fill="none" stroke="url(#qG2)" strokeWidth="4" />
-                  <rect x="10" y="60" width="10" height="10" fill="url(#qG2)" />
-                  <rect x="34" y="3" width="6" height="6" fill="#43ff8e" /><rect x="42" y="3" width="6" height="6" fill="#06b6d4" />
-                  <rect x="34" y="11" width="6" height="6" fill="#06b6d4" /><rect x="42" y="11" width="6" height="6" fill="#43ff8e" />
-                  <rect x="34" y="19" width="6" height="6" fill="#8b5cf6" />
-                  <rect x="3" y="34" width="6" height="6" fill="#43ff8e" /><rect x="11" y="34" width="6" height="6" fill="#06b6d4" /><rect x="19" y="34" width="6" height="6" fill="#43ff8e" />
-                  <rect x="34" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="34" width="6" height="6" fill="#43ff8e" />
-                  <rect x="50" y="34" width="6" height="6" fill="#06b6d4" /><rect x="58" y="34" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="34" width="6" height="6" fill="#43ff8e" />
-                  <rect x="3" y="42" width="6" height="6" fill="#06b6d4" /><rect x="19" y="42" width="6" height="6" fill="#8b5cf6" />
-                  <rect x="34" y="42" width="6" height="6" fill="#43ff8e" /><rect x="50" y="42" width="6" height="6" fill="#06b6d4" /><rect x="66" y="42" width="6" height="6" fill="#43ff8e" />
-                  <rect x="34" y="50" width="6" height="6" fill="#8b5cf6" /><rect x="42" y="50" width="6" height="6" fill="#06b6d4" /><rect x="58" y="50" width="6" height="6" fill="#43ff8e" />
-                  <rect x="34" y="58" width="6" height="6" fill="#06b6d4" /><rect x="50" y="58" width="6" height="6" fill="#8b5cf6" />
-                  <rect x="34" y="66" width="6" height="6" fill="#43ff8e" /><rect x="42" y="66" width="6" height="6" fill="#06b6d4" />
-                  <rect x="58" y="66" width="6" height="6" fill="#8b5cf6" /><rect x="66" y="58" width="6" height="6" fill="#06b6d4" /><rect x="66" y="66" width="6" height="6" fill="#43ff8e" />
-                </svg>
-              </div>
-            </div>
-
-            <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
-              <div style={{
-                display:'inline-flex', alignItems:'center', gap:'6px',
-                background: pageMode === 'inward'
-                  ? 'linear-gradient(90deg, rgba(67,255,142,0.18), rgba(6,182,212,0.12))'
-                  : pageMode === 'outward'
-                    ? 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(139,92,246,0.12))'
-                    : 'linear-gradient(90deg, rgba(250,204,21,0.18), rgba(249,115,22,0.12))',
-                border: `1px solid ${pageMode === 'inward' ? 'rgba(67,255,142,0.5)' : pageMode === 'outward' ? 'rgba(6,182,212,0.5)' : 'rgba(250,204,21,0.5)'}`,
-                borderRadius:'30px', padding:'3px 14px', marginBottom:'8px',
-                fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase',
-                color: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
-                boxShadow: pageMode === 'inward' ? '0 0 12px rgba(67,255,142,0.2)' : pageMode === 'outward' ? '0 0 12px rgba(6,182,212,0.2)' : '0 0 12px rgba(250,204,21,0.2)',
-              }}>
-                <span style={{
-                  width:'5px', height:'5px', borderRadius:'50%', flexShrink:0,
-                  background: pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15',
-                  boxShadow: `0 0 6px ${pageMode === 'inward' ? '#43ff8e' : pageMode === 'outward' ? '#06b6d4' : '#facc15'}`,
-                }} />
-                {pageMode === 'inward' ? '⬇ Inward' : pageMode === 'outward' ? '⬆ Outward' : '⟳ Default'}
-              </div>
-              <h2 style={{
-                margin:0, fontSize:'1.7rem', fontWeight:800,
-                fontFamily:"'Playfair Display', 'Cormorant Garamond', Georgia, serif",
-                fontStyle:'italic', letterSpacing:'0.01em', lineHeight:1.15,
-                background:'linear-gradient(90deg, #ffffff 0%, #c7f4ff 30%, #43ff8e 60%, #06b6d4 100%)',
-                WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
-                filter:'drop-shadow(0 2px 12px rgba(67,255,142,0.25))',
-              }}>
-                {pageMode === 'inward'
-                  ? 'QR Scanner — Gate Entry + Weight'
-                  : pageMode === 'outward'
-                    ? 'QR Scanner — Gate Entry'
-                    : 'QR Scanner — Gate Entry + Weight Document'}
-              </h2>
-              <div style={{ width:'65%', height:'1px', margin:'8px auto', background:'linear-gradient(90deg, transparent, rgba(67,255,142,0.45), rgba(6,182,212,0.45), rgba(139,92,246,0.3), transparent)' }} />
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap' }}>
-                <span style={{ color:'#94d8f8', fontWeight:500, fontSize:'0.83rem', fontFamily:"'Playfair Display', Georgia, serif", letterSpacing:'0.03em', display:'flex', alignItems:'center', gap:'5px' }}>
-                  <span>📡</span>
-                  Scan QR slip to auto-fill vehicle &amp; invoice details
-                </span>
-                {/* <span style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(6,182,212,0.2))', border:'1px solid rgba(139,92,246,0.45)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#c4b5fd', fontWeight:700, letterSpacing:'0.05em', boxShadow:'0 0 8px rgba(139,92,246,0.15)' }}>
-                  🏗 Gate 2
-                </span> */}
-                <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', background:'rgba(67,255,142,0.1)', border:'1px solid rgba(67,255,142,0.3)', borderRadius:'8px', padding:'2px 10px', fontSize:'0.72rem', color:'#43ff8e', fontWeight:700, letterSpacing:'0.06em' }}>
-                  <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#43ff8e', boxShadow:'0 0 6px #43ff8e, 0 0 10px rgba(67,255,142,0.6)', display:'inline-block' }} />
-                  LIVE
-                </span>
-              </div>
-          </div>
-        </div>
-
-        <div style={{
-          position: 'absolute',
-          top: '0',
-          right: '0',
-          bottom: '0',
-          width: 'clamp(120px, 22vw, 240px)',
-          pointerEvents: 'none',
-          opacity: 0.94,
-          display: 'flex',
-          alignItems: 'stretch',
-          justifyContent: 'flex-end',
-          
-          overflow: 'hidden',
-        }}>
-          <img
-            src="/ChatGPT%20Image%20Mar%2026,%202026,%2004_04_01%20PM.png"
-            alt="Scanner"
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit: 'cover',
-              objectPosition: 'right center',
-              maskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
-              WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 35%, black 100%)',
-            }}
-          />
-        </div>
-      </div>
+    <div className="create-header-container" style={{ paddingTop: 14, paddingBottom: 14 }}>
+      {/* Simple heading instead of banner */}
+      <h2 style={{ textAlign: 'center', margin: '12px 0', fontWeight: 700, fontSize: '2rem', color: '#222' }}>
+        {pageMode === 'inward'
+          ? 'QR Scanner Inward'
+          : pageMode === 'outward'
+            ? 'QR Scanner Outward'
+            : 'QR Scanner'}
+      </h2>
 
       <form onSubmit={handleSubmit} onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.type !== 'submit') {
           e.preventDefault();
         }
       }}>
-        <section className="form-section">
-          <h3 className="section-title">Header Information</h3>
-          <div className="grid-7-cols">
-            <div className="form-group">
-              <label className="form-label">Gate Entry Number</label>
-              <input className="form-input" name="GateEntryNumber" value={header.GateEntryNumber} readOnly style={{ background: '#f0f0f0' }} />
+        <section className="form-section" style={{ marginBottom: 14, paddingBottom: 0 }}>
+          {/* <h3 className="section-title" style={{ marginBottom: 10 }}>Header Information</h3> */}
+          <div className="grid-7-cols" style={{ rowGap: 8 }}>
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Gate Entry Number</label>
+              <input className="form-input form-input-readonly" name="GateEntryNumber" value={header.GateEntryNumber} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Weight Doc Number</label>
-              <input className="form-input" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ background: '#f0f0f0' }} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Weight Doc Number</label>
+              <input className="form-input form-input-readonly" name="WeightDocNumber" value={header.WeightDocNumber} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Gate Entry Date *</label>
-              <input className="form-input" name="GateEntryDate" type="date" value={header.GateEntryDate} onChange={handleChange} required />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Gate Entry Date *</label>
+              <input className="form-input" name="GateEntryDate" type="date" value={header.GateEntryDate} onChange={handleChange} required style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Vehicle Number *</label>
-              <input className="form-input" name="VehicleNumber" value={header.VehicleNumber} onChange={handleChange} required />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Vehicle Number *</label>
+              <input className="form-input" name="VehicleNumber" value={header.VehicleNumber} onChange={handleChange} required style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-              <label className="form-label">Transporter Code</label>
-              <input
-                className="form-input"
-                name="TransporterCode"
-                value={header.TransporterCode}
-                onChange={handleChange}
-                onFocus={() => handleTransporterFocus('TransporterCode')}
-              />
+            <div className="form-group form-group-relative" style={{ marginBottom: 6 }} onClick={(e) => e.stopPropagation()}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Transporter Code</label>
+              <input className="form-input" name="TransporterCode" value={header.TransporterCode} onChange={handleChange} onFocus={() => handleTransporterFocus('TransporterCode')} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               {transporterDropdown.show && transporterDropdown.field === 'TransporterCode' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  zIndex: 20,
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-                }}>
+                <div className="dropdown-list">
                   {transporterDropdown.loading && (
-                    <div style={{ padding: '8px 10px', color: '#555' }}>Loading...</div>
+                    <div className="dropdown-list-loading">Loading...</div>
                   )}
                   {!transporterDropdown.loading && transporterDropdown.list.length === 0 && (
-                    <div style={{ padding: '8px 10px', color: '#555' }}>No transporters found</div>
+                    <div className="dropdown-list-empty">No transporters found</div>
                   )}
                   {!transporterDropdown.loading && transporterDropdown.list.map((t, idx) => (
                     <div
                       key={`${t.TransporterCode || 'code'}-${idx}`}
-                      style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                      className="dropdown-list-item"
                       onClick={() => handleSelectTransporter(t)}
                     >
-                      <div style={{ fontWeight: 600 }}>{t.TransporterCode}</div>
-                      <div style={{ fontSize: '0.9rem', color: '#475569' }}>{t.TransporterName}</div>
+                      <div className="dropdown-list-item-code">{t.TransporterCode}</div>
+                      <div className="dropdown-list-item-name">{t.TransporterName}</div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-              <label className="form-label">Transporter Name</label>
-              <input
-                className="form-input"
-                name="TransporterName"
-                value={header.TransporterName}
-                onChange={handleChange}
-                onFocus={() => handleTransporterFocus('TransporterName')}
-              />
+            <div className="form-group form-group-relative" style={{ marginBottom: 6 }} onClick={(e) => e.stopPropagation()}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Transporter Name</label>
+              <input className="form-input" name="TransporterName" value={header.TransporterName} onChange={handleChange} onFocus={() => handleTransporterFocus('TransporterName')} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
               {transporterDropdown.show && transporterDropdown.field === 'TransporterName' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  zIndex: 20,
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-                }}>
+                <div className="dropdown-list">
                   {transporterDropdown.loading && (
-                    <div style={{ padding: '8px 10px', color: '#555' }}>Loading...</div>
+                    <div className="dropdown-list-loading">Loading...</div>
                   )}
                   {!transporterDropdown.loading && transporterDropdown.list.length === 0 && (
-                    <div style={{ padding: '8px 10px', color: '#555' }}>No transporters found</div>
+                    <div className="dropdown-list-empty">No transporters found</div>
                   )}
                   {!transporterDropdown.loading && transporterDropdown.list.map((t, idx) => (
                     <div
                       key={`${t.TransporterCode || 'name'}-${idx}`}
-                      style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                      className="dropdown-list-item"
                       onClick={() => handleSelectTransporter(t)}
                     >
-                      <div style={{ fontWeight: 600 }}>{t.TransporterName}</div>
-                      <div style={{ fontSize: '0.9rem', color: '#475569' }}>{t.TransporterCode}</div>
+                      <div className="dropdown-list-item-name">{t.TransporterName}</div>
+                      <div className="dropdown-list-item-code">{t.TransporterCode}</div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Driver Name</label>
-              <input className="form-input" name="DriverName" value={header.DriverName} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Driver Name</label>
+              <input className="form-input" name="DriverName" value={header.DriverName} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Driver Phone</label>
-              <input className="form-input" name="DriverPhoneNumber" value={header.DriverPhoneNumber} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Driver Phone</label>
+              <input className="form-input" name="DriverPhoneNumber" value={header.DriverPhoneNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">LR/GC Number</label>
-              <input className="form-input" name="LRGCNumber" value={header.LRGCNumber} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>LR/GC Number</label>
+              <input className="form-input" name="LRGCNumber" value={header.LRGCNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Permit Number</label>
-              <input className="form-input" name="PermitNumber" value={header.PermitNumber} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Permit Number</label>
+              <input className="form-input" name="PermitNumber" value={header.PermitNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Sub Transporter Name</label>
-              <input className="form-input" name="SubTransporterName" value={header.SubTransporterName} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Sub Transporter Name</label>
+              <input className="form-input" name="SubTransporterName" value={header.SubTransporterName} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group form-group-checkbox">
-              <input type="checkbox" className="form-checkbox" name="EWayBill" checked={header.EWayBill} onChange={handleChange} />
-              <label className="form-checkbox-label">E-Way Bill</label>
+            <div className="form-group form-group-checkbox" style={{ marginBottom: 6, minHeight: 34, height: 34, display: 'flex', alignItems: 'center' }}>
+              <input type="checkbox" className="form-checkbox" name="EWayBill" checked={header.EWayBill} onChange={handleChange} style={{ marginRight: 6 }} />
+              <label className="form-checkbox-label" style={{ marginBottom: 0 }}>E-Way Bill</label>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Division</label>
-              <input className="form-input" name="Division" value={header.Division} onChange={handleChange} />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Division</label>
+              <input className="form-input" name="Division" value={header.Division} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Inward Time (auto)</label>
-              <input className="form-input" name="InwardTime" value={header.InwardTime} readOnly />
+            <div className="form-group" style={{ marginBottom: 6 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Inward Time (auto)</label>
+              <input className="form-input" name="InwardTime" value={header.InwardTime} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
             </div>
 
-            {pageMode !== "inward" && (
-            <div className="form-group">
-              <label className="form-label">Outward Time (will be set at submit)</label>
-              <input className="form-input" name="OutwardTime" value={header.OutwardTime} readOnly />
-            </div>
-            )}
+            {pageMode !== "inward" && (<div className="form-group" style={{ marginBottom: 6 }}><label className="form-label" style={{ marginBottom: 4 }}>Outward Time (will be set at submit)</label><input className="form-input" name="OutwardTime" value={header.OutwardTime} readOnly style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} /></div>)}
 
-            <div className="form-group full-width">
-              <label className="form-label">Remarks</label>
-              <textarea className="form-textarea" name="Remarks" value={header.Remarks} onChange={handleChange} rows={2} />
-              {duplicateMdpError && (
-                <div className="error-message" style={{ marginTop: '8px' }}>
-                  <strong>Error:</strong> {duplicateMdpError}
-                </div>
-              )}
+            <div className="form-group full-width" style={{ marginBottom: 6 }}><label className="form-label" style={{ marginBottom: 4 }}>Remarks</label><textarea className="form-textarea" name="Remarks" value={header.Remarks} onChange={handleChange} rows={2} style={{ minHeight: 30, height: 34, paddingTop: 4, paddingBottom: 4, backgroundColor: typeof header.Remarks === 'string' && (header.Remarks.match(/\|/g) || []).length >= 4 ? '#fffbe6' : undefined, fontWeight: typeof header.Remarks === 'string' && (header.Remarks.match(/\|/g) || []).length >= 4 ? 'bold' : undefined }} />{duplicateMdpError && (<div style={{ color: 'red', fontWeight: 500, margin: '4px 0' }}>{duplicateMdpError}</div>)}</div>
+          </div>
+        </section>
+
+        <section className="form-section" style={{ marginBottom: 14, paddingBottom: 0 }}>
+         {/* <h3 className="section-title" style={{ marginBottom: 10 }}>Purchase Order Details</h3>  */}
+          <div className="po-entry-card" style={{ marginBottom: 8, paddingBottom: 0 }}>
+            <h4 className="po-entry-title" style={{ marginBottom: 8 }}>PO Detals</h4>
+            <div className="grid-7-cols" style={{ rowGap: 8 }}>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>PO Number</label><input className="form-input" name="PurchaseOrderNumber" value={header.PurchaseOrderNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />{poApprovalError && (<div className="error-message" style={{ marginTop: '6px' }}><strong>Error:</strong> {poApprovalError}</div>)}
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Material</label><input className="form-input" name="Material" value={header.Material} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Material Description</label><input className="form-input" name="MaterialDescription" value={header.MaterialDescription} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Vendor</label><input className="form-input" name="Vendor" value={header.Vendor} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Vendor Name</label><input className="form-input" name="VendorName" value={header.VendorName} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Vendor Invoice No</label><input className="form-input" name="VendorInvoiceNumber" value={header.VendorInvoiceNumber} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Vendor Invoice Date</label><input className="form-input" type="date" name="VendorInvoiceDate" value={header.VendorInvoiceDate} onChange={handleChange} style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Vendor Invoice Weight</label>
+                <input
+                  className="form-input"
+                  name="VendorInvoiceWeight"
+                  type="text"
+                  inputMode="decimal"
+                  value={header.VendorInvoiceWeight}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  style={{
+                    borderColor: '#0b5ed7',
+                    backgroundColor: '#fff',
+                    height: 44,
+                    minHeight: 40,
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    fontSize: '1.18em',
+                    width: '130px'
+                  }}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>Balance Quantity</label>
+                <input
+                  className="form-input"
+                  name="BalanceQty"
+                  type="text"
+                  inputMode="decimal"
+                  value={header.BalanceQty}
+                  onChange={handleChange}
+                  placeholder="0.000"
+                  style={{
+                    borderColor: '#0b5ed7',
+                    backgroundColor: '#f0f0f0',
+                    height: 44,
+                    minHeight: 40,
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    fontSize: '1.18em',
+                    width: '130px'
+                  }}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 6 }}>
+                <label className="form-label" style={{ marginBottom: 4 }}>PO Quantity</label><input className="form-input" name="BalanceQty3" type="text" inputMode="decimal" value={header.BalanceQty3} onChange={handleChange} placeholder="0.000" style={{ height: 34, minHeight: 34, paddingTop: 4, paddingBottom: 4 }} />
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="form-section">
-          <h3 className="section-title">Purchase Order Details</h3>
-          <div className="po-entry-card">
-            <h4 className="po-entry-title">PO Entry</h4>
-            <div className="grid-7-cols">
-              <div className="form-group">
-                <label className="form-label">PO Number</label>
-                <input className="form-input" name="PurchaseOrderNumber" value={header.PurchaseOrderNumber} onChange={handleChange} />
-                {poApprovalError && (
-                  <div className="error-message" style={{ marginTop: '8px' }}>
-                    <strong>Error:</strong> {poApprovalError}
-                  </div>
-                )}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Material</label>
-                <input className="form-input" name="Material" value={header.Material} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Material Description</label>
-                <input className="form-input" name="MaterialDescription" value={header.MaterialDescription} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vendor</label>
-                <input className="form-input" name="Vendor" value={header.Vendor} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vendor Name</label>
-                <input className="form-input" name="VendorName" value={header.VendorName} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vendor Invoice No</label>
-                <input className="form-input" name="VendorInvoiceNumber" value={header.VendorInvoiceNumber} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vendor Invoice Date</label>
-                <input className="form-input" type="date" name="VendorInvoiceDate" value={header.VendorInvoiceDate} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vendor Invoice Weight</label>
-                <input className="form-input" name="VendorInvoiceWeight" type="text" inputMode="decimal" value={header.VendorInvoiceWeight} onChange={handleChange} placeholder="0.00" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Balance Quantity</label>
-                <input className="form-input" name="BalanceQty" type="text" inputMode="decimal" value={header.BalanceQty} onChange={handleChange} placeholder="0.000" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">PO Quantity</label>
-                <input className="form-input" name="BalanceQty3" type="text" inputMode="decimal" value={header.BalanceQty3} onChange={handleChange} placeholder="0.000" />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="form-actions">
-          <div className="form-group" style={{ minWidth: '280px', marginBottom: 0 }}>
-            <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700 }}>Gross Weight *</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="form-actions" style={{ marginTop: 10, marginBottom: 8, display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+          <div className="form-group gross-weight-group" style={{ marginBottom: 6, minWidth: '190px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <label className="form-label gross-weight-label" style={{ marginBottom: 4, color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em' }}>Gross Weight *</label>
+            <div className="gross-weight-row" style={{ minHeight: 44, height: 44, alignItems: 'center', display: 'flex', gap: '12px' }}>
               <input
-                className="form-input"
+                className="form-input gross-weight-input"
                 name="GrossWeight"
                 value={header.GrossWeight}
                 onChange={handleChange}
                 placeholder="Enter or Get Gross"
-                style={{ borderColor: '#0b5ed7', backgroundColor: '#fff' }}
                 inputMode="decimal"
+                style={{ borderColor: '#0b5ed7', backgroundColor: '#fff', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }}
               />
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-secondary gross-weight-btn"
                 onClick={handleGetGrossWeight}
                 disabled={grossWeightLoading || loading}
-                style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
+                style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff', height: 44, minHeight: 40, fontSize: '1.18em', padding: '0 24px', fontWeight: 700 }}
               >
                 {grossWeightLoading ? 'Getting...' : 'Get Gross'}
               </button>
-              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '8px' }}>
-                (You can enter manually or use Get Gross)
-              </span>
+              <span className="gross-weight-hint" style={{ marginLeft: 6, fontSize: '0.92em', color: '#888' }}>(You can enter manually or use Get Gross)</span>
             </div>
           </div>
-          <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`}>
+          <button type="submit" disabled={loading} className={`btn btn-primary ${loading ? 'disabled' : ''}`} style={{ height: 48, minHeight: 40, fontSize: '1.08em', padding: '0 28px', fontWeight: 700 }}>
             {loading ? "Creating..." : "✅ Create Gate Entry"}
           </button>
-          {/* <button type="button" onClick={resetForm} className="btn btn-secondary">Reset Form</button> */}
         </div>
       </form>
 
-      {error && (<div className="error-message"><strong>❌ Error:</strong> {error}</div>)}
-      {result && (
-        <div className="success-message">
-          <div className="success-header">
-            <svg viewBox="0 0 24 24" width="24" height="24">
-              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>
-            <h3>Success!</h3>
-          </div>
-          <div className="success-content">
-            <p><strong>{result}</strong></p>
-            {header.GateEntryNumber && (
-              <>
-                <p>Gate Entry Number: <strong>{header.GateEntryNumber}</strong></p>
-                <p>Weight Doc Number: <strong>{header.WeightDocNumber}</strong></p>
-                <p>Vehicle: {header.VehicleNumber}</p>
-                {header.GrossWeight && <p>Gross Weight: {header.GrossWeight} </p>}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {error && (<div style={{ color: 'red', fontWeight: 500, margin: '8px 0' }}>{error}</div>)}
+      {result && (<div className="success-message"><div className="success-header"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><h3>Success!</h3></div><div className="success-content"><p><strong>{result}</strong></p>{header.GateEntryNumber && (<><p>Gate Entry Number: <strong>{header.GateEntryNumber}</strong></p><p>Weight Doc Number: <strong>{header.WeightDocNumber}</strong></p><p>Vehicle: {header.VehicleNumber}</p>{header.GrossWeight && <p>Gross Weight: {header.GrossWeight} </p>}</>)}</div></div>)}
     </div>
   );
 }
@@ -1359,9 +1061,6 @@ const remarks = "25267031B000010 | 25267031T004063 | 19.26 | 16/10/2025 9:23 PM 
 const fields = parseQRRemarks(remarks);
 console.log(fields);
 
-
-
-
 // Helper: Fetch latest valid (non-cancelled) Gate Entry for a PO, using GateEntryDate and InwardTime
 function parseSapDurationToSeconds(duration) {
   // SAP duration format: PT14H22M41S
@@ -1379,24 +1078,21 @@ async function fetchLatestValidGateEntryForPO(poNumber) {
     // Query all gate entries for the PO
     const resp = await fetchGateEntryByNumber(`$filter=PurchaseOrderNumber eq '${poNumber}'`);
     const entries = resp?.data?.d?.results || resp?.data?.value || [];
+    // Filter out cancelled entries first
+    const validEntries = entries.filter(entry => String(entry.Status || entry["d:Status"] || "").toUpperCase() !== "CANCELLED");
     // Sort by GateEntryDate desc, then InwardTime desc
-    const sorted = entries.slice().sort((a, b) => {
-      let dateA = a.GateEntryDate || a["d:GateEntryDate"] || 0;
-      let dateB = b.GateEntryDate || b["d:GateEntryDate"] || 0;
-      dateA = typeof dateA === 'string' ? new Date(dateA) : dateA;
-      dateB = typeof dateB === 'string' ? new Date(dateB) : dateB;
-      if (dateA.getTime() !== dateB.getTime()) return dateB - dateA;
-      const tA = parseSapDurationToSeconds(a.InwardTime || a["d:InwardTime"]);
-      const tB = parseSapDurationToSeconds(b.InwardTime || b["d:InwardTime"]);
-      return tB - tA;
+    const sorted = validEntries.slice().sort((a, b) => {
+      let dateA = a.GateEntryDate || a["d:GateEntryDate"];
+      let dateB = b.GateEntryDate || b["d:GateEntryDate"];
+      let timeA = parseSapDurationToSeconds(a.InwardTime || a["d:InwardTime"]);
+      let timeB = parseSapDurationToSeconds(b.InwardTime || b["d:InwardTime"]);
+      // Handle missing/invalid dates
+      let tsA = dateA ? new Date(dateA).getTime() : 0;
+      let tsB = dateB ? new Date(dateB).getTime() : 0;
+      if (tsA !== tsB) return tsB - tsA;
+      return timeB - timeA;
     });
-    // Find the latest non-cancelled entry
-    for (const entry of sorted) {
-      if (String(entry.Status || entry["d:Status"] || "").toUpperCase() !== "CANCELLED") {
-        return entry;
-      }
-    }
-    return null;
+    return sorted[0] || null;
   } catch (err) {
     console.warn("Failed to fetch gate entries for PO", poNumber, err);
     return null;
@@ -1431,6 +1127,7 @@ const handleQRRemarks = async (remarks) => {
     if (latestEntry) {
       material = latestEntry.Material || latestEntry["d:Material"] || material;
       materialDescription = latestEntry.MaterialDescription || latestEntry["d:MaterialDescription"] || materialDescription;
+      // Only use BalanceQty, never BalanceQty2/3/4/5
       balanceQty = String(latestEntry.BalanceQty || latestEntry["d:BalanceQty"] || "");
     } else {
       // No valid gate entry: leave balanceQty blank
@@ -1448,7 +1145,7 @@ const handleQRRemarks = async (remarks) => {
     LRGCNumber: fields.PermitNumber || fields.mteNumber || prev.LRGCNumber,
     Material: material || prev.Material,
     MaterialDescription: materialDescription || prev.MaterialDescription,
-    BalanceQty: balanceQty, // Only from latest valid gate entry, never PO qty
+    BalanceQty: balanceQty, // Only from latest valid gate entry's BalanceQty
     BalanceQty3: poQty || prev.BalanceQty3,
     Division: fields.location || prev.Division,
     Remarks: remarks

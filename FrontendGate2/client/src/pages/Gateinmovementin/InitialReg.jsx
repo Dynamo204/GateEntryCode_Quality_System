@@ -22,13 +22,13 @@ const normalizeSoSuggestions = (payload) => {
 const getSoBalanceQty = (salesOrder = {}) => (
   salesOrder.OpenReqdDelivQtyInOrdQtyUnit
   ?? salesOrder.OpenReqdDelivQtyInBaseUnit
-  ?? salesOrder.BalanceQty
+  ?? salesOrder.DeliveryBalancyQTY
   ?? salesOrder.items?.[0]?.OpenReqdDelivQtyInOrdQtyUnit
   ?? salesOrder.items?.[0]?.OpenReqdDelivQtyInBaseUnit
-  ?? salesOrder.items?.[0]?.BalanceQty
+  ?? salesOrder.items?.[0]?.DeliveryBalancyQTY
   ?? salesOrder.headers?.[0]?.OpenReqdDelivQtyInOrdQtyUnit
   ?? salesOrder.headers?.[0]?.OpenReqdDelivQtyInBaseUnit
-  ?? salesOrder.headers?.[0]?.BalanceQty
+  ?? salesOrder.headers?.[0]?.DeliveryBalancyQTY
   ?? ""
 );
  
@@ -757,7 +757,7 @@ export default function InitialRegistration() {
                   color: availableQty > 0 ? "#256029" : "#c10000",
                   fontWeight: 500
                 }}>
-                  Available Quantity: {availableQty}
+                  Available Quantity: {Number(availableQty).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   {availableQty <= 0 && " (SO fully consumed)"}
                 </div>
               )}
@@ -806,7 +806,7 @@ export default function InitialRegistration() {
                           </div>
                           <div className="so-suggestion-meta">
                             {orderQty && <span>Order Qty: {orderQty}{orderUnit ? ` ${orderUnit}` : ""}</span>}
-                            {balanceQty !== undefined && balanceQty !== "" && <span>Balance Qty: {balanceQty}{orderUnit ? ` ${orderUnit}` : ""}</span>}
+                            {balanceQty !== undefined && balanceQty !== "" && <span>Balance Qty: {Number(balanceQty).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{orderUnit ? ` ${orderUnit}` : ""}</span>}
                           </div>
                         </div>
                       </li>

@@ -457,6 +457,7 @@ export default function MaterialOutwardTareCapture() {
           ToleranceWeight: outwardRecord.ToleranceWeight || '',
           ActuallyWeight: outwardRecord.ActuallyWeight || '',
           OutboundDelivery: outwardRecord.OutboundDelivery,
+          VehicleStatus:'OUT',
         }));
 
         setRecordFound(true);
@@ -533,6 +534,7 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
     YY1_PGIDate_DLH: formatSapODataDate(form.GateEntryDate),
     YY1_PGITime_DLH: formatSapTime(systemtime),
     YY1_LRDate_DLH: formatSapODataDate(form.GateEntryDate),
+     BillOfLading: form.LRGCNumber,
    // YY1_WeighbridgeTime_DLH: new Date().toISOString().slice(11, 19)
   }
 });
@@ -540,11 +542,11 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-     //  'http://localhost:4600/api/goodsissue-and-invoice-int',
+       'http://localhost:4600/api/goodsissue-and-invoice-int',
      //  'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
-     //   'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+    //    'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
   //    'https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/goodsissue-and-invoice',
-       'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+   //   'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
       { DeliveryDocument: deliveryDoc },
       { responseType: 'arraybuffer', timeout: 60000 } // use arraybuffer for binary
     );

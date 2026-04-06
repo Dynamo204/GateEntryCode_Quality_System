@@ -1,517 +1,566 @@
 
-// import React, { useState } from "react";
-// import html2pdf from "html2pdf.js";
-// import axios from "axios";
-
-// export default function ReprintGateEntry() {
-
-//   const [gateEntryNumber, setGateEntryNumber] = useState("");
-//   const [headerData, setHeaderData] = useState(null);
-//   const [loading, setLoading] = useState(false);
-//   const [error, setError] = useState("");
-
-//   // 🔹 API CALL
-//   const fetchGateWeighmentDetails = (gateEntryNumber) => {
-//   return axios.get(`http://localhost:4600/api/weightdetails?gateEntryNumber=${encodeURIComponent(gateEntryNumber)}`);
-//   };
-
-//   // 🔹 FORMATTER
-//   const f = (val) => {
-//     return val === undefined || val === null || val === "" ? "-" : val;
-//   };
-
-//   const formatDate = (sapDate) => {
-//     if (!sapDate) return "-";
-//     const ms = parseInt(sapDate.replace(/\/Date\((\d+)\)\//, "$1"));
-//     return new Date(ms).toLocaleDateString("en-GB");
-//   };
-
-//   const formatTime = (time) => {
-//     if (!time) return "-";
-//     return time.replace("PT", "").replace("H", ":").replace("M", ":").replace("S", "");
-//   };
-
-//   // ================= FETCH =================
-//   const handleFetch = async () => {
-//     setLoading(true);
-//     setError("");
-
-//     try {
-//       const res = await fetchGateWeighmentDetails(gateEntryNumber);
-
-//       const gate = res?.data?.gateEntry;
-//       const weight = res?.data?.weighments?.[0];
-
-//       if (!gate) {
-//         setError("No Data Found");
-//         return;
-//       }
-
-//       // 🔥 MERGE
-//       const merged = {
-//         ...gate,
-//         GrossWeight: weight?.GrossWeight || gate.GrossWeight,
-//         TareWeight: weight?.TareWeight || gate.TareWeight,
-//         NetWeight: weight?.NetWeight || gate.NetWeight,
-//         WeightDocNumber: weight?.WeightDocNumber,
-//       };
-
-//       setHeaderData(merged);
-
-//     } catch (err) {
-//       setError("Fetch failed");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   // ================= SLIP =================
-//   const buildSlipElement = async () => {
-
-//     const now = new Date();
-//     const printDate = now.toLocaleDateString("en-GB");
-//     const printTime = now.toLocaleTimeString("en-GB");
-
-//     let logo = "";
-//     try {
-//       const res = await fetch("/Minera_Logo.jpg");
-//       const blob = await res.blob();
-//       logo = await new Promise(r => {
-//         const reader = new FileReader();
-//         reader.onloadend = () => r(reader.result);
-//         reader.readAsDataURL(blob);
-//       });
-//     } catch {}
-
-//     const isSD = !!headerData?.SalesDocument;
-
-//     const element = document.createElement("div");
-
-//     element.innerHTML = `
-//       <div style="font-family: Arial; padding:10px; font-size:12px;">
-
-//         <div style="display:flex; justify-content:space-between;">
-//           <h3>Minera Steel & Power Pvt Ltd</h3>
-//           ${logo ? `<img src="${logo}" style="height:40px"/>` : ""}
-//         </div>
-
-//         <h4 style="text-align:center;">WEIGHMENT SLIP</h4>
-
-//         <table style="width:100%;">
-//           <tr><td>Gate Entry</td><td>${f(headerData.GateEntryNumber)}</td><td>Date</td><td>${printDate}</td></tr>
-//           <tr><td>Time</td><td>${printTime}</td><td>Vehicle</td><td>${f(headerData.VehicleNumber)}</td></tr>
-//           <tr><td>Transporter</td><td>${f(headerData.TransporterName)}</td><td>Driver</td><td>${f(headerData.DriverName)}</td></tr>
-//           <tr><td>Gross</td><td>${f(headerData.GrossWeight)}</td><td>Tare</td><td>${f(headerData.TareWeight)}</td></tr>
-//           <tr><td>Net</td><td>${f(headerData.NetWeight)}</td><td></td><td></td></tr>
-//         </table>
-
-//         <hr/>
-
-//         ${
-//           isSD
-//           ? `
-//             <h4>Sales Details</h4>
-//             <table border="1" style="width:100%; border-collapse:collapse;">
-//               <tr>
-//                 <th>Sales</th><th>Customer</th><th>Name</th><th>Material</th><th>Description</th>
-//               </tr>
-//               <tr>
-//                 <td>${f(headerData.SalesDocument)}</td>
-//                 <td>${f(headerData.Customer)}</td>
-//                 <td>${f(headerData.CustomerName)}</td>
-//                 <td>${f(headerData.Material)}</td>
-//                 <td>${f(headerData.MaterialDescription)}</td>
-//               </tr>
-//             </table>
-//           `
-//           : `
-//             <h4>PO Details</h4>
-//             <table border="1" style="width:100%; border-collapse:collapse;">
-//               <tr>
-//                 <th>PO</th><th>Item</th><th>Vendor</th><th>Name</th><th>Material</th>
-//               </tr>
-//               <tr>
-//                 <td>${f(headerData.PurchaseOrderNumber)}</td>
-//                 <td>${f(headerData.PurchaseOrderItem)}</td>
-//                 <td>${f(headerData.Vendor)}</td>
-//                 <td>${f(headerData.VendorName)}</td>
-//                 <td>${f(headerData.Material)}</td>
-//               </tr>
-//             </table>
-//           `
-//         }
-
-//         <br/>
-
-//         <div style="display:flex; justify-content:space-between;">
-//           <div>Security</div>
-//           <div>Operator</div>
-//           <div>Authorized</div>
-//         </div>
-
-//       </div>
-//     `;
-
-//     return element;
-//   };
-
-//   // ================= PRINT =================
-//   const handlePrint = async () => {
-//     const el = await buildSlipElement();
-
-//     html2pdf()
-//       .set({
-//         margin: 5,
-//         filename: `Weighment_${headerData.GateEntryNumber}.pdf`,
-//         html2canvas: { scale: 2 },
-//         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-//       })
-//       .from(el)
-//       .save();
-//   };
-
-//   // ================= UI =================
-//   return (
-//     <div style={{ padding: 20 }}>
-//       <h2>Reprint Weighment Slip</h2>
-
-//       <input
-//         value={gateEntryNumber}
-//         onChange={(e) => setGateEntryNumber(e.target.value)}
-//         placeholder="Enter Gate Entry Number"
-//       />
-
-//       <button onClick={handleFetch}>
-//         {loading ? "Loading..." : "Fetch"}
-//       </button>
-
-//       {error && <p style={{ color: "red" }}>{error}</p>}
-
-//       {headerData && (
-//         <div style={{ marginTop: 20 }}>
-//           <button onClick={handlePrint}>Download / Print Slip</button>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
-
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import html2pdf from "html2pdf.js";
 import axios from "axios";
-//import reprint from "ReprintGateEntry.css";
 
 export default function ReprintGateEntry() {
-
   const [gateEntryNumber, setGateEntryNumber] = useState("");
   const [headerData, setHeaderData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ================= API =================
-  const fetchGateWeighmentDetails = (gateEntryNumber) => {
-    return axios.get(
-      `https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails?gateEntryNumber=${encodeURIComponent(gateEntryNumber)}`
-    );
-  };
+  const [allList, setAllList] = useState([]);
+  const [filteredList, setFilteredList] = useState([]);
+  const [showList, setShowList] = useState(false);
 
-  // ================= HELPERS =================
-  const f = (val) => val || "-";
+  // ================= LOAD ALL DATA ONCE =================
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
-  const formatDate = (sapDate) => {
-    if (!sapDate) return "-";
-    const ms = parseInt(sapDate.replace(/\/Date\((\d+)\)\//, "$1"));
-    return new Date(ms).toLocaleDateString("en-GB");
-  };
-
-  // ================= FETCH =================
-  const handleFetch = async () => {
+  const fetchAllData = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const res = await fetchGateWeighmentDetails(gateEntryNumber);
+     const res = await axios.get("http://localhost:4600/api/weightdetails/all");
+     // const res = await axios.get("https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
+     //  const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
 
-      const gate = res?.data?.gateEntry;
-      const weight = res?.data?.weighments?.[0];
-
-      if (!gate) {
-        setError("No Data Found");
-        return;
-      }
-
-      const merged = {
-        ...gate,
-        GrossWeight: weight?.GrossWeight || gate.GrossWeight,
-        TareWeight: weight?.TareWeight || gate.TareWeight,
-        NetWeight: weight?.NetWeight || gate.NetWeight,
-        WeightDocNumber: weight?.WeightDocNumber,
-      };
-
-      setHeaderData(merged);
-
+      const data = Array.isArray(res.data) ? res.data : [];
+      setAllList(data);
+      setFilteredList(data);
     } catch (err) {
-      setError("Fetch failed");
+      console.log(err);
+      setError("Failed to load data");
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= SLIP =================
-  const buildSlipElement = async () => {
-    const now = new Date();
-    const printDate = now.toLocaleDateString("en-GB");
-    const printTime = now.toLocaleTimeString("en-GB");
+  // ================= FRONTEND SEARCH =================
+const handleSearchChange = (value) => {
+  setGateEntryNumber(value);
+  setHeaderData(null);
+  setError("");
 
-    const prefix = String(headerData?.GateEntryNumber || "").slice(0, 3);
-    const isSD = prefix === "261"; // Sales
-    const isPO = prefix === "262"; // Purchase
-
-    // Fetch Minera logo as base64
-    let logo = "";
-    try {
-      const res = await fetch("/Minera_Logo.jpg");
-      const blob = await res.blob();
-      logo = await new Promise(r => {
-        const reader = new FileReader();
-        reader.onloadend = () => r(reader.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch {}
-
-    const element = document.createElement("div");
-
-    element.innerHTML = `
-      <div style="font-family: Arial; padding:15px; font-size:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Minera Steel & Power Pvt Ltd</h3>
-          ${logo ? `<img src="${logo}" style="height:40px; margin-left:10px;"/>` : ""}
-        </div>
-        <h4 style="text-align:center;">WEIGHMENT SLIP</h4>
-
-        <table style="width:100%; margin-top:10px;">
-          <tr>
-            <td><b>Gate Entry</b></td><td>${f(headerData.GateEntryNumber)}</td>
-            <td><b>Date</b></td><td>${printDate}</td>
-          </tr>
-          <tr>
-            <td><b>Time</b></td><td>${printTime}</td>
-            <td><b>Vehicle</b></td><td>${f(headerData.VehicleNumber)}</td>
-          </tr>
-          <tr>
-            <td><b>Transporter</b></td><td>${f(headerData.TransporterName)}</td>
-            <td><b>Driver</b></td><td>${f(headerData.DriverName)}</td>
-          </tr>
-          <tr>
-            <td><b>Gross</b></td><td>${f(headerData.GrossWeight)}</td>
-            <td><b>Tare</b></td><td>${f(headerData.TareWeight)}</td>
-          </tr>
-          <tr>
-            <td><b>Net</b></td><td>${f(headerData.NetWeight)}</td>
-            <td></td><td></td>
-          </tr>
-        </table>
-
-        <hr/>
-
-        ${
-          isSD
-            ? `
-              <h4>Sales Details</h4>
-              <table border="1" style="width:100%; border-collapse:collapse;">
-                <tr>
-                  <th>Sales Doc</th>
-                  <th>Customer</th>
-                  <th>Customer Name</th>
-                  <th>Material</th>
-                  <th>Description</th>
-                </tr>
-                <tr>
-                  <td>${f(headerData.SalesDocument)}</td>
-                  <td>${f(headerData.Customer)}</td>
-                  <td>${f(headerData.CustomerName)}</td>
-                  <td>${f(headerData.Material)}</td>
-                  <td>${f(headerData.MaterialDescription)}</td>
-                </tr>
-              </table>
-            `
-            : isPO
-            ? `
-              <h4>Purchase Order Details</h4>
-              <table border="1" style="width:100%; border-collapse:collapse;">
-                <tr>
-                  <th>PO Number</th>
-                  <th>Item</th>
-                  <th>Vendor</th>
-                  <th>Vendor Name</th>
-                  <th>Material</th>
-                  <th>Plant</th>
-                </tr>
-                <tr>
-                  <td>${f(headerData.PurchaseOrderNumber)}</td>
-                  <td>${f(headerData.PurchaseOrderItem)}</td>
-                  <td>${f(headerData.Vendor)}</td>
-                  <td>${f(headerData.VendorName)}</td>
-                  <td>${f(headerData.Material)}</td>
-                  <td>${f(headerData.Plant)}</td>
-                </tr>
-              </table>
-
-              <br/>
-
-              <table style="width:100%;">
-                <tr>
-                  <td><b>Permit No</b></td><td>${f(headerData.PermitNumber)}</td>
-                  <td><b>LR No</b></td><td>${f(headerData.LRGCNumber)}</td>
-                </tr>
-              </table>
-            `
-            : `<p>No format available</p>`
-        }
-
-        <br/><br/>
-
-        <div style="display:flex; justify-content:space-between;">
-          <div>Security Officer</div>
-          <div>Weigh Bridge Operator</div>
-          <div>Authorized Sign</div>
-        </div>
-
-      </div>
-    `;
-
-    return element;
-  };
-
-  // ================= PRINT =================
-  const handlePrint = async () => {
-    const el = await buildSlipElement();
-
-    html2pdf()
-      .set({
-        margin: 5,
-        filename: `Weighment_${headerData.GateEntryNumber}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      })
-      .from(el)
-      .save();
-  };
-
-  // ================= UI =================
-  return (
-    <div className="reprint-page">
-      <div className="reprint-header">
-        <h2>Reprint Weighment Slip</h2>
-        <a href="/" className="reprint-back-btn">&larr; Back</a>
-      </div>
-
-      <div className="reprint-card">
-        <form onSubmit={e => { e.preventDefault(); handleFetch(); }}>
-          <div className="reprint-form-fields">
-            <label htmlFor="gateEntryNumber" className="reprint-form-label">Gate Entry Number</label>
-            <div className="reprint-form-row">
-              <input
-                id="gateEntryNumber"
-                value={gateEntryNumber}
-                onChange={e => setGateEntryNumber(e.target.value)}
-                placeholder="Enter Gate Entry Number"
-                className="reprint-input"
-                autoFocus
-              />
-              <button
-                className="reprint-primary-btn"
-                type="submit"
-                disabled={loading || !gateEntryNumber.trim()}
-              >
-                {loading ? 'Loading...' : 'Fetch'}
-              </button>
-            </div>
-            {error && <div className="reprint-error">{error}</div>}
-          </div>
-        </form>
-      </div>
-
-      {headerData && (
-        <div className="reprint-card result">
-          <div className="reprint-result-head">
-            <h3 className="reprint-result-title">Result</h3>
-            <div className="reprint-cta-group">
-              <button className="reprint-secondary-btn" onClick={handlePrint}>Download / Print Slip</button>
-            </div>
-          </div>
-          <div className="reprint-grid">
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Gate Entry</span><span className="reprint-grid-value">{headerData.GateEntryNumber || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Vehicle</span><span className="reprint-grid-value">{headerData.VehicleNumber || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Date</span><span className="reprint-grid-value">{headerData.GateEntryDate ? formatDate(headerData.GateEntryDate) : '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Transporter</span><span className="reprint-grid-value">{headerData.TransporterName || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Driver</span><span className="reprint-grid-value">{headerData.DriverName || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Gross Weight</span><span className="reprint-grid-value">{headerData.GrossWeight || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Tare Weight</span><span className="reprint-grid-value">{headerData.TareWeight || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Net Weight</span><span className="reprint-grid-value">{headerData.NetWeight || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">Permit No</span><span className="reprint-grid-value">{headerData.PermitNumber || '-'}</span></div>
-            <div className="reprint-grid-item"><span className="reprint-grid-label">LR/GC No</span><span className="reprint-grid-value">{headerData.LRGCNumber || '-'}</span></div>
-          </div>
-
-          {/* Table for PO or Sales details */}
-          <div className="reprint-table-wrap">
-            {headerData.PurchaseOrderNumber ? (
-              <>
-                <h4 className="reprint-table-title">Purchase Order Details</h4>
-                <table className="reprint-table">
-                  <thead>
-                    <tr>
-                      <th>PO Number</th>
-                      <th>Item</th>
-                      <th>Vendor</th>
-                      <th>Vendor Name</th>
-                      <th>Material</th>
-                      <th>Plant</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{headerData.PurchaseOrderNumber || '-'}</td>
-                      <td>{headerData.PurchaseOrderItem || '-'}</td>
-                      <td>{headerData.Vendor || '-'}</td>
-                      <td>{headerData.VendorName || '-'}</td>
-                      <td>{headerData.Material || '-'}</td>
-                      <td>{headerData.Plant || '-'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            ) : headerData.SalesDocument ? (
-              <>
-                <h4 className="reprint-table-title">Sales Details</h4>
-                <table className="reprint-table">
-                  <thead>
-                    <tr>
-                      <th>Sales Doc</th>
-                      <th>Customer</th>
-                      <th>Customer Name</th>
-                      <th>Material</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{headerData.SalesDocument || '-'}</td>
-                      <td>{headerData.Customer || '-'}</td>
-                      <td>{headerData.CustomerName || '-'}</td>
-                      <td>{headerData.Material || '-'}</td>
-                      <td>{headerData.MaterialDescription || '-'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </div>
+  // ✅ FILTER FROM ALL DATA
+  let filtered = allList.filter(item =>
+    (item.GateEntryNumber || "")
+      .toLowerCase()
+      .includes(value.toLowerCase())
   );
+
+  // ✅ SORT LATEST ON TOP
+  filtered = filtered.sort((a, b) =>
+    (b.GateEntryNumber || "").localeCompare(a.GateEntryNumber || "")
+  );
+
+  setFilteredList(filtered);
+};
+  // ================= SELECT ITEM =================
+  const handleSelect = (item) => {
+    setGateEntryNumber(item.GateEntryNumber || "");
+    setHeaderData(item);
+    setShowList(false);
+    setError("");
+  };
+
+  // ================= FETCH BUTTON LOCAL =================
+  const handleFetch = () => {
+    if (!gateEntryNumber.trim()) {
+      setError("Please enter Gate Entry Number");
+      return;
+    }
+
+    const selected = allList.find(
+      (item) => item.GateEntryNumber === gateEntryNumber
+    );
+
+    if (!selected) {
+      setHeaderData(null);
+      setError("No Data Found");
+      return;
+    }
+
+    setHeaderData(selected);
+    setShowList(false);
+    setError("");
+  };
+
+  // ================= PDF PRINT =================
+const handlePrint = async () => {
+  if (!headerData) return;
+
+  const gate = headerData.GateEntryNumber || "";
+
+  // ✅ TYPE BASED ON 3rd DIGIT
+  const type =
+    gate[2] === "1" ? "SD" :
+    gate[2] === "2" ? "PO" : "UNKNOWN";
+
+  const f = (v) => v ?? "";
+
+  // ✅ LOGO LOAD
+  let logo = "";
+  try {
+    const res = await fetch("/Minera_Logo.jpg");
+    const blob = await res.blob();
+
+    logo = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.log("Logo load failed");
+  }
+
+  // ✅ FORMAT FUNCTIONS
+  const formatSAPDate = (sapDate) => {
+    if (!sapDate) return "";
+    const match = /\/Date\((\d+)\)\//.exec(sapDate);
+    if (!match) return sapDate;
+    return new Date(parseInt(match[1])).toLocaleDateString("en-GB");
+  };
+
+  const formatSAPTime = (sapTime) => {
+    if (!sapTime) return "";
+    const match = /PT(\d+)H(\d+)M(\d+)S/.exec(sapTime);
+    if (!match) return sapTime;
+    return `${match[1]}:${match[2]}:${match[3]}`;
+  };
+
+  const getShift = (sapTime) => {
+    if (!sapTime) return "";
+    const match = /PT(\d+)H/.exec(sapTime);
+    if (!match) return "";
+    const hour = parseInt(match[1]);
+
+    if (hour >= 6 && hour < 12) return "A";
+    if (hour >= 12 && hour < 18) return "B";
+    return "C";
+  };
+
+  const el = document.createElement("div");
+
+  // ================= SD TEMPLATE =================
+  const getSDTemplate = () => `
+  <div style="font-family:'Times New Roman'; padding:20px; font-size:14px;">
+
+    <div style="display:flex; justify-content:space-between;">
+      <div>
+        <h2 style="margin:0;">Minera Steel & Power Pvt Ltd</h2>
+        <div style="font-size:12px;">Factory Address: Yerabanahalli, Karnataka</div>
+      </div>
+      ${logo ? `<img src="${logo}" style="height:60px;" />` : ""}
+    </div>
+
+    <h3 style="text-align:center;">Weighbridge Ticket (SD)</h3>
+
+    <div style="display:flex; justify-content:space-between;">
+      <div><b>Date:</b> ${new Date().toLocaleDateString()}</div>
+      <div><b>Time:</b> ${new Date().toLocaleTimeString()}</div>
+    </div>
+
+    <hr/>
+
+    <div style="display:flex; justify-content:space-between;">
+
+      <table>
+        <tr><td><b>Weighment No</b></td><td>: ${f(headerData.WeightDocNumber)}</td></tr>
+        <tr><td><b>Gate Entry</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
+        <tr><td><b>Truck</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
+        <tr><td><b>Party Code</b></td><td>: ${f(headerData.Customer)}</td></tr>
+        <tr><td><b>Transporter Code</b></td><td>: ${f(headerData.TransporterCode)}</td></tr>
+        <tr><td><b>Delivery Note</b></td><td>: ${f(headerData.OutboundDelivery)}</td></tr>
+        <tr><td><b>Shift</b></td><td>: ${getShift(headerData.InwardTime)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>Product Name</b></td><td>: ${f(headerData.MaterialDescription)}</td></tr>
+        <tr><td><b>Product Code</b></td><td>: ${f(headerData.Material)}</td></tr>
+        <tr><td><b>Party</b></td><td>: ${f(headerData.CustomerName)}</td></tr>
+        <tr><td><b>Transporter</b></td><td>: ${f(headerData.TransporterName)}</td></tr>
+        <tr><td><b>BillingDocument</b></td><td>: ${f(headerData.BillingDocument)}</td></tr>
+        <tr><td><b>Batch</b></td><td>: ${f(headerData.Batch)}</td></tr>
+      </table>
+
+    </div>
+
+    <br/>
+
+    <div style="display:flex; justify-content:space-between;">
+
+      <table>
+        <tr><td><b>Date In</b></td><td>: ${formatSAPDate(headerData.GateEntryDate)}</td></tr>
+        <tr><td><b>Time In</b></td><td>: ${formatSAPTime(headerData.InwardTime)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>Date Out</b></td><td>: ${formatSAPDate(headerData.GateOutDate)}</td></tr>
+        <tr><td><b>Time Out</b></td><td>: ${formatSAPTime(headerData.OutwardTime)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>Tare</b></td><td>: ${f(headerData.TareWeight)} t</td></tr>
+        <tr><td><b>Gross</b></td><td>: ${f(headerData.GrossWeight)} t</td></tr>
+        <tr><td><b>Net</b></td><td>: <b>${f(headerData.NetWeight)} t</b></td></tr>
+      </table>
+
+    </div>
+
+    <hr/>
+    <p style="font-size:12px;">Note: This truck/vehicle weighment transanction includes the driver's weight</p>
+
+  </div>
+  `;
+
+  // ================= PO TEMPLATE =================
+  const getPOTemplate = () => `
+  <div style="font-family:'Times New Roman'; padding:20px; font-size:14px;">
+
+    <div style="display:flex; justify-content:space-between;">
+      <div>
+        <h2 style="margin:0;">Minera Steel & Power Pvt Ltd</h2>
+        <div style="font-size:12px;">Factory Address: Yerabanahalli, Karnataka</div>
+      </div>
+      ${logo ? `<img src="${logo}" style="height:60px;" />` : ""}
+    </div>
+
+    <h3 style="text-align:center;">Weighbridge Ticket (Purchase)</h3>
+
+    <div style="display:flex; justify-content:space-between;">
+      <div><b>Date:</b> ${new Date().toLocaleDateString()}</div>
+      <div><b>Time:</b> ${new Date().toLocaleTimeString()}</div>
+    </div>
+
+    <hr/>
+
+    <div style="display:flex; justify-content:space-between;">
+
+      <table>
+        <tr><td><b>Weighment No</b></td><td>: ${f(headerData.WeightDocNumber)}</td></tr>
+        <tr><td><b>Gate Entry</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
+        <tr><td><b>Truck</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
+        <tr><td><b>Party Code</b></td><td>: ${f(headerData.Vendor)}</td></tr>
+        <tr><td><b>Transporter Code</b></td><td>: ${f(headerData.TransporterCode)}</td></tr>
+        <tr><td><b>Challan Number</b></td><td>: ${f(headerData.VendorInvoiceNumber)}</td></tr>
+        <tr><td><b>Challan Weight</b></td><td>: ${f(headerData.VendorInvoiceWeight)}</td></tr>
+        <tr><td><b>Miscellaneous</b></td><td>: ${f(headerData.Remarks)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>PO Number</b></td><td>: ${f(headerData.PurchaseOrderNumber)}</td></tr>
+        <tr><td><b>Product Name</b></td><td>: ${f(headerData.MaterialDescription)}</td></tr>
+        <tr><td><b>Party</b></td><td>: ${f(headerData.VendorName)}</td></tr>
+        <tr><td><b>Transporter Name</b></td><td>: ${f(headerData.TransporterName)}</td></tr>
+        <tr><td><b>Challan Date</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate)}</td></tr>
+        <tr><td><b>Sub Transporter Name</b></td><td>: ${f(headerData.SubTransporterName)}</td></tr>
+        <tr><td><b>Shift</b></td><td>: ${getShift(headerData.InwardTime)}</td></tr>
+      </table>
+
+    </div>
+
+    <br/>
+
+    <div style="display:flex; justify-content:space-between;">
+
+      <table>
+        <tr><td><b>Date In</b></td><td>: ${formatSAPDate(headerData.GateEntryDate)}</td></tr>
+        <tr><td><b>Time In</b></td><td>: ${formatSAPTime(headerData.InwardTime)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>Date Out</b></td><td>: ${formatSAPDate(headerData.GateOutDate)}</td></tr>
+        <tr><td><b>Time Out</b></td><td>: ${formatSAPTime(headerData.OutwardTime)}</td></tr>
+      </table>
+
+      <table>
+        <tr><td><b>Tare</b></td><td>: ${f(headerData.TareWeight)} t</td></tr>
+        <tr><td><b>Gross</b></td><td>: ${f(headerData.GrossWeight)} t</td></tr>
+        <tr><td><b>Net</b></td><td>: <b>${f(headerData.NetWeight)} t</b></td></tr>
+      </table>
+
+    </div>
+
+    <hr/>
+    <p style="font-size:12px;">Note: This truck/vehicle weighment transanction includes the driver's weight</p>
+
+  </div>
+  `;
+
+  // ✅ SELECT TEMPLATE
+  let htmlContent = "";
+
+  if (type === "SD") {
+    htmlContent = getSDTemplate();
+  } else if (type === "PO") {
+    htmlContent = getPOTemplate();
+  } else {
+    alert("Unknown Gate Entry Type");
+    return;
+  }
+
+  el.innerHTML = htmlContent;
+
+  // ✅ PDF
+  html2pdf().set({
+    margin: 5,
+    html2canvas: { scale: 3 },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+  })
+  .from(el)
+  .save(`Slip_${headerData.GateEntryNumber}.pdf`);
+};
+  // ================= UI =================
+const sortedList = [...filteredList].sort((a, b) =>
+  (b.GateEntryNumber || "").localeCompare(a.GateEntryNumber || "")
+);
+
+return (
+  <div style={styles.container}>
+
+    {/* HEADER */}
+    <div style={styles.header}>
+      <h2>Weighment Slip Reprint</h2>
+    </div>
+
+    {/* SEARCH */}
+    <div style={styles.searchBar}>
+      <input
+        style={styles.input}
+        value={gateEntryNumber}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        placeholder="Search Gate Entry Number..."
+      />
+      <button onClick={handleFetch} style={styles.fetchBtn}>
+        Fetch
+      </button>
+    </div>
+
+    {/* MAIN */}
+    <div style={styles.main}>
+
+      {/* LEFT PANEL */}
+      <div style={styles.leftPanel}>
+        <h3>Gate Entries</h3>
+
+        {sortedList.map((item, i) => (
+          <div
+            key={i}
+            style={{
+              ...styles.listItem,
+              ...(headerData?.GateEntryNumber === item.GateEntryNumber
+                ? styles.activeItem
+                : {})
+            }}
+            onClick={() => handleSelect(item)}
+            onMouseEnter={(e) => {
+              if (headerData?.GateEntryNumber !== item.GateEntryNumber)
+                e.currentTarget.style.background = "#e6f0ff";
+            }}
+            onMouseLeave={(e) => {
+              if (headerData?.GateEntryNumber !== item.GateEntryNumber)
+                e.currentTarget.style.background = "#fafafa";
+            }}
+          >
+            <b>GateEntryNumber: {item.GateEntryNumber}</b>
+            <div style={styles.subText}>
+            WeighmentDoc {item.WeightDocNumber} | Vehicle  {item.VehicleNumber} |  BillingDocument  {item.BillingDocument}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* RIGHT PANEL */}
+      <div style={styles.rightPanel}>
+
+        {headerData ? (
+          <>
+            <h3>Details</h3>
+
+            <div style={styles.detailsGrid}>
+              <p><b>Gate Entry:</b> {headerData.GateEntryNumber}</p>
+              <p><b>Vehicle:</b> {headerData.VehicleNumber}</p>
+              <p><b>Transporter:</b> {headerData.TransporterCode} - {headerData.TransporterName}</p>
+              <p><b>Material:</b> {headerData.MaterialDescription}</p>
+              <p><b>Gross:</b> {headerData.GrossWeight}</p>
+              <p><b>Tare:</b> {headerData.TareWeight}</p>
+              <p><b>Net:</b> {headerData.NetWeight}</p>
+            </div>
+
+            {/* TABLE */}
+            <h4>Item List</h4>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Billing</th>
+                  <th style={styles.th}>Material</th>
+                  <th style={styles.th}>PO/OBD</th>
+                  <th style={styles.th}>Vendor/Customer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1,2,3,4,5].map(i => {
+                  const bill = headerData[`BillingDocument${i === 1 ? "" : i}`];
+                  const desc = headerData[`MaterialDescription${i === 1 ? "" : i}`];
+                  const po = headerData[`PurchaseOrderNumber${i === 1 ? "" : i}`]|| headerData[`OutboundDelivery${i === 1 ? "" : i}`];
+                  const ven = headerData[`VendorName${i === 1 ? "" : i}`] || headerData[`CustomerName${i === 1 ? "" : i}`];
+
+                  if (!desc && !po) return null;
+
+                  return (
+                    <tr key={i}>
+                      <td style={styles.td}>{bill}</td>
+                      <td style={styles.td}>{desc}</td>
+                      <td style={styles.td}>{po}</td>
+                      <td style={styles.td}>{ven}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <button style={styles.printBtn} onClick={handlePrint}>
+              Print Slip
+            </button>
+          </>
+        ) : (
+          <div style={styles.empty}>
+            Select a Gate Entry to view details
+          </div>
+        )}
+
+      </div>
+    </div>
+  </div>
+);
 }
+
+// ================= STYLES =================
+const styles = {
+  container: {
+    padding: "20px",
+    fontFamily: "Segoe UI, Arial",
+    background: "#f4f6f9",
+    minHeight: "100vh"
+  },
+
+  header: {
+    marginBottom: "15px",
+    position: "sticky",
+    top: 0,
+    background: "#f4f6f9",
+    padding: "10px 0",
+    zIndex: 10
+  },
+
+  searchBar: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "15px"
+  },
+
+  input: {
+    flex: 1,
+    padding: "10px",
+    border: "1px solid #ccc",
+    borderRadius: "6px"
+  },
+
+  fetchBtn: {
+    padding: "10px 16px",
+    background: "#007bff",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer"
+  },
+
+  main: {
+    display: "flex",
+    height: "75vh"
+  },
+
+  leftPanel: {
+    width: "30%",
+    background: "#fff",
+    borderRadius: "8px",
+    padding: "10px",
+    overflowY: "auto",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+  },
+
+  listItem: {
+    padding: "12px",
+    borderBottom: "1px solid #eee",
+    cursor: "pointer",
+    borderRadius: "6px",
+    marginBottom: "6px",
+    background: "#fafafa",
+    transition: "0.2s"
+  },
+
+  activeItem: {
+    background: "#007bff",
+    color: "#fff"
+  },
+
+  subText: {
+    fontSize: "12px",
+    color: "#666"
+  },
+
+  rightPanel: {
+    width: "70%",
+    marginLeft: "15px",
+    background: "#fff",
+    borderRadius: "8px",
+    padding: "15px",
+    overflowY: "auto",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+  },
+
+  detailsGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+    marginBottom: "15px"
+  },
+
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    marginTop: "10px"
+  },
+
+  th: {
+    border: "1px solid #ccc",
+    padding: "8px",
+    background: "#007bff",
+    color: "#fff"
+  },
+
+  td: {
+    border: "1px solid #ccc",
+    padding: "8px"
+  },
+
+  printBtn: {
+    marginTop: "15px",
+    padding: "10px",
+    background: "green",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    width: "200px",
+    cursor: "pointer"
+  },
+
+  empty: {
+    textAlign: "center",
+    color: "#888",
+    marginTop: "50px"
+  }
+};

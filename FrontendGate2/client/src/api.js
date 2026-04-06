@@ -1,9 +1,8 @@
-
 import axios from 'axios';
 //export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
 //export const API_BASE = 'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api';
-export const API_BASE = 'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api';
-//export const API_BASE = 'http://localhost:4600/api';
+//export const API_BASE = 'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api';
+export const API_BASE = 'http://localhost:4600/api';
 
 const API_TIMEOUT_MS = 120000;
 
@@ -108,10 +107,18 @@ export const fetchGateEntryByNumber = (gateEntryNumberOrFilter) => {
 export const fetchGateWeighmentDetails = (gateEntryNumber) => {
   return api.get(`/weightdetails?gateEntryNumber=${encodeURIComponent(gateEntryNumber)}`);
 };
+// export const fetchGateWeighmentDetails = (gateEntryNumber) => {
+//   return api.get(`/api/weightdetails/search?search=${encodeURIComponent(gateEntryNumber)}`);
+// };
 
 export const fetchpurchaseOrderQTY = (poNumber) => {
-  return api.get(`/api/headers/QRWeightment1/${poNumber}`);
+  return api.get(`/headers/QRWeightment1/${poNumber}`);
 }
+// Fetch QR Weightment summary for a PO
+export function fetchQRWeightmentSummary(poNumber) {
+  return api.get(`/headers/QRWeightment1/${poNumber}`);
+}
+ 
 
 // RGP-specific fetch by gate entry number (for RGP Gate Out)
 // Duplicate removed: fetchRgpGateEntryByNumber
