@@ -224,7 +224,13 @@ export function fetchsodetails(search) {
 export function transporterDetails(search) { 
   return api.get(`/transporterdetails?search=${encodeURIComponent(search)}`); 
 }
-
+// Fetch sub-transporter details by PO Number for QR FLOW
+export function fetchSubTransporterByPurchaseOrder(poNumber) {
+  return api.get(`/subtransporter/${encodeURIComponent(poNumber)}`, {
+    validateStatus: (status) => status === 200 || status === 404,
+    meta: { suppressExpected404: true },
+  });
+}
 // Fetch transporter master list for dropdowns
 export function fetchTransporters() {
   return api.get('/transporters');
@@ -443,5 +449,9 @@ export function fetchVendorDetails({ code, name }) {
   if (code) params.set('code', code);
   if (name) params.set('name', name);
   return api.get(`/rgpprocess/vendors?${params.toString()}`);
+}
+
+export function createItpWeighment(payload) {
+  return api.post('/headers/itp-weighment', payload);
 }
 export default api;

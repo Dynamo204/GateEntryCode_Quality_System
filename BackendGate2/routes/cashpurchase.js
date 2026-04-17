@@ -282,7 +282,7 @@ router.post('/item', async (req, res) => {
       };
       // Navigation property URL (as in Postman)
     //  const NAV_URL = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA%27${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
-     //const NAV_URL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
+    // const NAV_URL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
       const NAV_URL = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
       let csrfToken, cookies;
       try {

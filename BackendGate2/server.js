@@ -48,6 +48,7 @@ app.use("/api/nrgpprocess", nrgpProcessRouter);
 // const SAP_BASE_UserAccess = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
 // const SAP_BASE_LiveDashBoard = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
 // const SAP_BASE_Transporter = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+// const SAP_BASE_SubTransporter = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAINTAINSUBTRANSPORTER_CDS';
 
 // const SAP_BASE_PO = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
 // const SAP_BASE_GRN = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
@@ -74,6 +75,7 @@ const SAP_BASE_InitialRegistration = 'https://my430382-api.s4hana.cloud.sap/sap/
 const SAP_BASE_UserAccess = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
 const SAP_BASE_LiveDashBoard = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
 const SAP_BASE_Transporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+const SAP_BASE_SubTransporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAINTAINSUBTRANSPORTER_CDS';
 
 const SAP_BASE_PO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
 const SAP_BASE_GRN = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
@@ -101,6 +103,7 @@ const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sa
 // const SAP_BASE_UserAccess = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
 // const SAP_BASE_LiveDashBoard = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
 // const SAP_BASE_Transporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+// const SAP_BASE_SubTransporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAINTAINSUBTRANSPORTER_CDS';
 
 // const SAP_BASE_PO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
 // const SAP_BASE_GRN = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV';
@@ -198,6 +201,14 @@ const sapAxiosOBD = axios.create({
     password: SAP_PASS_ST 
   }
 });
+const sapAxiosSubTransporter = axios.create({
+  baseURL: SAP_BASE_SubTransporter,
+  auth: {
+    username: SAP_USER,
+    password: SAP_PASS
+  }
+});
+
 const sapAxiosBilling = axios.create({
   baseURL: SAP_BASE_BILLING,
   auth: { 
@@ -466,10 +477,48 @@ const { Mutex } = require('async-mutex');
 const { raw } = require('body-parser');
 const gateNumberMutex = new Mutex();
 
+function parseDateInput(value) {
+  if (!value) return new Date();
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') return new Date(value);
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const sapMatch = trimmed.match(/\/Date\((\d+)\)\//);
+    if (sapMatch) {
+      return new Date(Number(sapMatch[1]));
+    }
+
+    if (/^\d{4}$/.test(trimmed)) {
+      return new Date(Number(trimmed), 3, 1);
+    }
+
+    return new Date(trimmed);
+  }
+
+  return new Date(value);
+}
+
 // Build prefix based on Indian financial year (April-March)
+// function buildPrefixFromYearAndCode(dateInput, codeInput) {
+//   // dateInput: string (YYYY-MM-DD) or Date object
+//   let date = dateInput ? new Date(dateInput) : new Date();
+//   let year = date.getFullYear();
+//   let month = date.getMonth() + 1; // JS months: 0-11
+
+//   // If before April, use previous year as financial year start
+//   if (month < 4) year = year - 1;
+
+//   const yy = String(year).slice(-2);
+//   const code = String(codeInput);
+//   return `${yy}${code}`;
+// }
 function buildPrefixFromYearAndCode(dateInput, codeInput) {
-  // dateInput: string (YYYY-MM-DD) or Date object
-  let date = dateInput ? new Date(dateInput) : new Date();
+
+  let date = parseDateInput(dateInput);
+  if (Number.isNaN(date.getTime())) {
+    date = new Date();
+  }
   let year = date.getFullYear();
   let month = date.getMonth() + 1; // JS months: 0-11
 
@@ -480,6 +529,8 @@ function buildPrefixFromYearAndCode(dateInput, codeInput) {
   const code = String(codeInput);
   return `${yy}${code}`;
 }
+
+
 
 function computeNextGateEntryNumber(prefix, latestGateNumber) {
   const suffixLength = 7; // 3(prefix) + 7 = 10 digits
@@ -691,6 +742,45 @@ app.get('/api/transporterdetails', async (req, res) => {
   }
 });
 
+//sub-transporter details by PO number for QR scanning flow
+app.get('/api/subtransporter/:poNumber', async (req, res) => {
+  const poNumber = String(req.params.poNumber || '').trim();
+  if (!poNumber) {
+    return res.status(400).json({ error: 'PO number is required' });
+  }
+
+  try {
+    const escapedPoNumber = poNumber.replace(/'/g, "''");
+    const filter = `PurchaseDocument eq '${escapedPoNumber}' and SAP_LifecycleStatus eq 'A'`;
+    const path = `/YY1_MAINTAINSUBTRANSPORTER?$filter=${filter}&$select=SAP_UUID,SNo,PurchaseDocument,SubTransporterName,MainTransporterCode,MainTransporterName,SAP_LifecycleStatus,SAP_LastChangedDateTime&$orderby=SAP_LastChangedDateTime desc,SNo desc&$format=json`;
+    const resp = await sapAxiosSubTransporter.get(path);
+    const results = resp.data?.d?.results || resp.data?.value || [];
+
+    if (!results.length) {
+      return res.status(404).json({ error: 'No transporter mapping found for this PO', results: [] });
+    }
+
+    const mapped = results.map(item => ({
+      SAP_UUID: item.SAP_UUID,
+      SNo: item.SNo,
+      PurchaseDocument: item.PurchaseDocument,
+      SubTransporterName: item.SubTransporterName || '',
+      MainTransporterCode: item.MainTransporterCode || '',
+      MainTransporterName: item.MainTransporterName || '',
+      SAP_LifecycleStatus: item.SAP_LifecycleStatus || ''
+    }));
+
+    return res.json({
+      result: mapped[0],
+      results: mapped
+    });
+  } catch (err) {
+    console.error('Sub transporter fetch error', err?.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to fetch sub transporter details' });
+  }
+});
+
+
 
 /* GET headers with query forwarding */
 app.get('/api/headers', async (req, res) => {
@@ -710,21 +800,40 @@ app.get('/api/headers', async (req, res) => {
 });
 
 
-
-
 app.get('/api/weightdetails/all', async (req, res) => {
   try {
 
-    const path =
-      `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$top=100&$filter=VehicleStatus eq 'OUT' &$format=json`;
-    const response = await sapAxiosReprint.get(path);
-    const results = response.data?.d?.results || [];
+    const pageSize = 200;   // safe limit
+    let skip = 0;
+    let allResults = [];
+    let hasMore = true;
 
-    const finalData = results.map(item => ({
+    while (hasMore) {
+
+      const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=VehicleStatus eq 'OUT'&$top=${pageSize}&$skip=${skip}&$format=json`;
+
+      const response = await sapAxiosReprint.get(path);
+
+      const results = response.data?.d?.results || [];
+
+      allResults.push(...results);
+
+      console.log(`Fetched ${results.length} records (skip=${skip})`);
+
+      // 🔥 STOP CONDITION
+      if (results.length < pageSize) {
+        hasMore = false;
+      } else {
+        skip += pageSize;
+      }
+    }
+
+    // ================= MAP DATA =================
+    const finalData = allResults.map(item => ({
       GateEntryNumber: item.GateEntryNumber,
       WeightDocNumber: item.WeightDocNumber,
       VehicleNumber: item.VehicleNumber || "-",
-      BillingDocument: item.BillingDocument ||"-",
+      BillingDocument: item.BillingDocument || "-",
       GrossWeight: item.GrossWeight || "-",
       TareWeight: item.TareWeight || "-",
       NetWeight: item.NetWeight || "-",
@@ -742,7 +851,7 @@ app.get('/api/weightdetails/all', async (req, res) => {
       PurchaseOrderNumber4: item.PurchaseOrderNumber4 || "-",
       PurchaseOrderNumber5: item.PurchaseOrderNumber5 || "-",
       Material: item.Material || "-",
-      Material2: item.Material2|| "-",
+      Material2: item.Material2 || "-",
       Material3: item.Material3 || "-",
       Material4: item.Material4 || "-",
       Material5: item.Material5 || "-",
@@ -751,31 +860,26 @@ app.get('/api/weightdetails/all', async (req, res) => {
       MaterialDescription3: item.MaterialDescription3 || "-",
       MaterialDescription4: item.MaterialDescription4 || "-",
       MaterialDescription5: item.MaterialDescription5 || "-",
-
       VendorInvoiceNumber: item.VendorInvoiceNumber || "-",
       VendorInvoiceNumber2: item.VendorInvoiceNumber2 || "-",
       VendorInvoiceNumber3: item.VendorInvoiceNumber3 || "-",
       VendorInvoiceNumber4: item.VendorInvoiceNumber4 || "-",
       VendorInvoiceNumber5: item.VendorInvoiceNumber5 || "-",
-
       VendorInvoiceDate: item.VendorInvoiceDate || "-",
       VendorInvoiceDate2: item.VendorInvoiceDate2 || "-",
       VendorInvoiceDate3: item.VendorInvoiceDate3 || "-",
       VendorInvoiceDate4: item.VendorInvoiceDate4 || "-",
       VendorInvoiceDate5: item.VendorInvoiceDate5 || "-",
-
       VendorInvoiceWeight: item.VendorInvoiceWeight || "-",
       VendorInvoiceWeight2: item.VendorInvoiceWeight2 || "-",
       VendorInvoiceWeight3: item.VendorInvoiceWeight3 || "-",
       VendorInvoiceWeight4: item.VendorInvoiceWeight4 || "-",
       VendorInvoiceWeight5: item.VendorInvoiceWeight5 || "-",
-
       BalanceQty: item.BalanceQty || "-",
       BalanceQty2: item.BalanceQty2 || "-",
       BalanceQty3: item.BalanceQty3 || "-",
       BalanceQty4: item.BalanceQty4 || "-",
       BalanceQty5: item.BalanceQty5 || "-",
-
       InwardTime: item.InwardTime || "-",
       OutwardTime: item.OutwardTime || "-",
       GateEntryDate: item.GateEntryDate || "-",
@@ -784,8 +888,9 @@ app.get('/api/weightdetails/all', async (req, res) => {
       SAP_CreatedDateTime: item.SAP_CreatedDateTime || "-"
     }));
 
+    console.log('[API] Total records fetched:', finalData.length);
+
     res.json(finalData);
-    console.log('[API] ReprintAPI ->', finalData.length, 'records fetched');
 
   } catch (err) {
     console.error("ERROR:", err?.response?.data || err.message);
@@ -965,9 +1070,11 @@ app.get('/api/po-material-balance', async (req, res) => {
 
   try {
     /***********************
-     * 1️⃣ Fetch PO Ordered Qty
+     * 1️⃣ Fetch PO Ordered Qty + Tolerance
      ***********************/
     let orderedQty = 0;
+    let tolerancePct = 0;
+    let unlimitedOverdelivery = false;
 
     try {
       const poPath =
@@ -976,24 +1083,40 @@ app.get('/api/po-material-balance', async (req, res) => {
       const poResp = await sapAxiosPO.get(poPath);
       const poItems = poResp.data?.value || [];
 
-      console.log(
-        `[DEBUG] PO items for ${poNumber} & ${material}:`,
-        poItems
-      );
+      console.log(`[DEBUG] PO items:`, poItems);
 
       orderedQty = poItems.reduce(
         (sum, item) => sum + Number(item.OrderQuantity || 0),
         0
       );
+
+      // 👉 Take tolerance from first item (or you can loop if needed)
+      if (poItems.length > 0) {
+        tolerancePct = Number(poItems[0].OverdelivTolrtdLmtRatioInPct || 0);
+        unlimitedOverdelivery = poItems[0].UnlimitedOverdeliveryIsAllowed;
+      }
+
     } catch (poErr) {
       console.error(
-        'Error fetching PO ordered qty:',
+        'Error fetching PO data:',
         poErr?.response?.data || poErr.message
       );
     }
 
     /***********************
-     * 2️⃣ Fetch Gate Entries
+     * 2️⃣ Apply Tolerance Logic
+     ***********************/
+    let allowedQty = orderedQty;
+
+    if (!unlimitedOverdelivery) {
+      const toleranceQty = (orderedQty * tolerancePct) / 100;
+      allowedQty = orderedQty + toleranceQty;
+    } else {
+      allowedQty = Infinity; // No limit
+    }
+
+    /***********************
+     * 3️⃣ Fetch Gate Entries
      ***********************/
     const poFilter = [
       `PurchaseOrderNumber eq '${poNumber}'`,
@@ -1021,7 +1144,7 @@ app.get('/api/po-material-balance', async (req, res) => {
       gateResp.data?.d?.results || gateResp.data?.value || [];
 
     /***********************
-     * 3️⃣ Calculate Received Qty (FIXED)
+     * 4️⃣ Calculate Received Qty
      ***********************/
     const normalize = v =>
       v == null ? '' : String(v).replace(/^0+/, '').trim();
@@ -1048,7 +1171,6 @@ app.get('/api/po-material-balance', async (req, res) => {
         ge.Material5
       ].map(normalize);
 
-      // 👇 Quantity field used (change if needed)
       const qtyFields = [
         ge.VendorInvoiceWeight,
         ge.VendorInvoiceWeight2,
@@ -1057,34 +1179,43 @@ app.get('/api/po-material-balance', async (req, res) => {
         ge.VendorInvoiceWeight5
       ].map(Number);
 
-      // ✅ SINGLE LOOP (no duplicate counting)
       for (let i = 0; i < 5; i++) {
         if (poFields[i] === normPo && matFields[i] === normMat) {
           const qty = qtyFields[i] || 0;
           receivedQty += qty;
 
           console.log(
-            `[DEBUG] Gate ${ge.GateEntryNumber} → PO ${poFields[i]}, Material ${matFields[i]}, Qty ${qty}`
+            `[DEBUG] Gate ${ge.GateEntryNumber} → Qty ${qty}`
           );
         }
       }
     });
 
     /***********************
-     * 4️⃣ Remaining Qty
+     * 5️⃣ Remaining Qty (WITH TOLERANCE)
      ***********************/
-    const remainingQty = Math.max(orderedQty - receivedQty, 0);
+    let remainingQty;
+
+    if (allowedQty === Infinity) {
+      remainingQty = Infinity;
+    } else {
+      remainingQty = Math.max(allowedQty - receivedQty, 0);
+    }
 
     /***********************
-     * 5️⃣ Response
+     * 6️⃣ Response
      ***********************/
     res.json({
       poNumber,
       material,
       orderedQty,
       receivedQty,
-      remainingQty
+      remainingQty,
+      tolerancePct,
+    //  allowedQty,
+    //  unlimitedOverdelivery
     });
+
   } catch (err) {
     console.error(
       'Error fetching PO+Material balance:',
@@ -1123,7 +1254,7 @@ app.get('/api/po/pricing', async (req, res) => {
     // Use the correct SAP OData4 endpoint for PO pricing
    // const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
      const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
-   //const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
+  // const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
     const sapRes = await axios.get(url, {
       headers: {
         "Accept": "application/json"
@@ -1248,8 +1379,8 @@ let allPOItems = [];
 for (const po of poNumbers) {
   try {
 //const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
-    const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
- //  const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
+     const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
+  // const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
 
     const resp = await sapAxios.get(url, {
       auth: {
@@ -1402,31 +1533,31 @@ allPOItems.forEach((poItem, index) => {
       }
     }
 }
-    if (req.body.Indicators === "O") {
+if (req.body.Indicators === "O") {
       
      //   const sodetails = "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
        const sodetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
-     // const sodetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
-  + req.body.SalesDocument + "'&$format=json";
+    //  const sodetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS/YY1_RFID_SO?$filter=SalesDocument eq '"
+      + req.body.SalesDocument + "'&$format=json";
  
-const sodetailsresp = await sapAxios.get(sodetails, {
-  auth: {
-    username: SAP_USER,
-    password: SAP_PASS
-  }
-});
+      const sodetailsresp = await sapAxios.get(sodetails, {
+      auth: {
+      username: SAP_USER,
+      password: SAP_PASS
+      }
+    });
 
 //Transporter details can also be fetched here if needed using req.body.TransporterCode and similar approach
 const transporterDetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
 
 //const transporterDetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
 
-const transporterDetailsResp = await sapAxiosTransporter.get(transporterDetails, {
-  auth: {
-    username: SAP_USER,
-    password: SAP_PASS
-  }
-});
+    const transporterDetailsResp = await sapAxiosTransporter.get(transporterDetails, {
+     auth: {
+      username: SAP_USER,
+      password: SAP_PASS
+      }
+    });
  
 const sodetailsresults = sodetailsresp.data?.d?.results || [];
 const transporterDetailsResults = transporterDetailsResp.data?.d?.results || [];
@@ -1556,6 +1687,7 @@ const SAP_PASS2 = "BTPIntegration@1234567890";
 
 /* POST Material Inward - Weight Bridge */
 app.post('/api/headers/material/in', async (req, res) => {
+   await weightDocMutex.runExclusive(async () => {
   try {
 
     const input = sanitizePayloadForSapServerSide(req.body);
@@ -1760,6 +1892,273 @@ app.post('/api/headers/material/in', async (req, res) => {
     });
   }
 });
+});
+
+
+
+app.post('/api/headers/itp-weighment', async (req, res) => {
+  try {
+    const input = sanitizePayloadForSapServerSide(req.body);
+    const gateEntryNumber = String(input.GateEntryNumber || '').trim();
+
+    if (!gateEntryNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gate Entry Number is required',
+      });
+    }
+
+    const grossWeight = parsePositiveDecimal(input.GrossWeight);
+    if (!grossWeight) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gross Weight is required and must be greater than zero',
+      });
+    }
+
+    const escapedGateEntryNumber = gateEntryNumber.replace(/'/g, "''");
+    const headerResp = await sapAxios.get(
+      `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${escapedGateEntryNumber}'&$format=json`
+    );
+    const header = headerResp.data?.d?.results?.[0] || headerResp.data?.value?.[0] || null;
+
+    if (!header) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gate Entry not found',
+      });
+    }
+
+    const { date: currentDate3 } = getCurrentIndiaDateTimeParts();
+
+    function convertSapDateToYMD(sapDate) {
+      if (!sapDate) return null;
+
+      if (typeof sapDate === 'string' && sapDate.startsWith('/Date(')) {
+        const timestamp = parseInt(sapDate.match(/\d+/)[0]);
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      }
+
+      return sapDate;
+    }
+
+    const gateEntryDateFormatted = convertSapDateToYMD(header.GateEntryDate);
+    console.log('Gate Entry Date (formatted):', gateEntryDateFormatted, 'Current Date:', currentDate3);
+    if (gateEntryDateFormatted !== currentDate3) {
+      return res.status(400).json({
+        success: false,
+        message: `Weighment not allowed. Gate Entry (${gateEntryNumber}) is from ${gateEntryDateFormatted}. Create new Gate Entry.`,
+      });
+    }
+
+    const headerUuid = extractEntityUuid(header);
+    if (!headerUuid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gate Entry UUID not found',
+      });
+    }
+
+    const tareWeight = parsePositiveDecimal(header.TareWeight);
+    if (!tareWeight) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tare Weight is missing in Gate Entry. Update Gate Entry tare weight first.',
+      });
+    }
+
+    const { date: currentDate, time: currentTime } = getCurrentIndiaDateTimeParts();
+    const outwardTime = formatSapTime(input.OutwardTime || currentTime);
+    const inwardTime = formatSapTime(input.InwardTime || header.InwardTime || currentTime);
+    const gateEntryDate = normalizeSapDateValue(header.GateEntryDate || input.GateEntryDate, currentDate);
+    const gateOutDate = normalizeSapDateValue(input.GateOutDate || currentDate, currentDate);
+    const netWeight = Number((grossWeight - tareWeight).toFixed(3));
+
+    const prefixSourceDate = header.GateEntryDate || input.GateEntryDate || currentDate;
+    const code = input.code || req.body.code || 5;
+    const prefix = buildPrefixFromYearAndCode(prefixSourceDate, code);
+    const latestWeightNumber = await getLatestWeightDocNumberFromSap(prefix);
+    const weightDocNumber = computeNextWeightDocNumber(prefix, latestWeightNumber);
+
+    const weighmentPayload = {
+      GateEntryNumber: header.GateEntryNumber,
+      WeightDocNumber: weightDocNumber,
+      Indicators: header.Indicators,
+      TruckNumber: header.VehicleNumber || header.TruckNumber || '',
+      GrossWeight: grossWeight.toFixed(3),
+      TareWeight: tareWeight.toFixed(3),
+      NetWeight: netWeight.toFixed(3),
+      InwardTime: inwardTime,
+      OutwardTime: outwardTime,
+      GateEntryDate: gateEntryDate,
+      GateOutDate: gateOutDate,
+      VehicleStatus: 'OUT',
+      Status: 'Success',
+    };
+
+    const mirroredFields = [
+      'TransporterCode',
+      'LRGCNumber',
+      'PermitNumber',
+      'Material',
+      'Material2',
+      'Material3',
+      'Material4',
+      'Material5',
+      'MaterialDescription',
+      'MaterialDescription2',
+      'MaterialDescription3',
+      'MaterialDescription4',
+      'MaterialDescription5',
+      'Vendor',
+      'Vendor2',
+      'Vendor3',
+      'Vendor4',
+      'Vendor5',
+      'VendorName',
+      'VendorName2',
+      'VendorName3',
+      'VendorName4',
+      'VendorName5',
+      'PurchaseOrderNumber',
+      'PurchaseOrderItem',
+      'PurchaseOrderNumber2',
+      'PurchaseOrderItem2',
+      'PurchaseOrderNumber3',
+      'PurchaseOrderItem3',
+      'PurchaseOrderNumber4',
+      'PurchaseOrderItem4',
+      'PurchaseOrderNumber5',
+      'PurchaseOrderItem5',
+      'VendorInvoiceNumber',
+      'VendorInvoiceNumber2',
+      'VendorInvoiceNumber3',
+      'VendorInvoiceNumber4',
+      'VendorInvoiceNumber5',
+      'VendorInvoiceDate',
+      'VendorInvoiceDate2',
+      'VendorInvoiceDate3',
+      'VendorInvoiceDate4',
+      'VendorInvoiceDate5',
+      'VendorInvoiceWeight',
+      'VendorInvoiceWeight2',
+      'VendorInvoiceWeight3',
+      'VendorInvoiceWeight4',
+      'VendorInvoiceWeight5',
+      'BalanceQty',
+      'BalanceQty2',
+      'BalanceQty3',
+      'BalanceQty4',
+      'BalanceQty5',
+      'FiscalYear',
+    ];
+
+    mirroredFields.forEach(field => {
+      if (header[field] !== undefined && header[field] !== null && header[field] !== '') {
+        weighmentPayload[field] = header[field];
+      }
+    });
+
+    const { token: weightToken, cookies: weightCookies } = await fetchCsrfTokenWeight();
+    const weighmentResp = await sapAxiosWeight.post(
+      '/YY1_CAPTURINGWEIGHTDETAILS',
+      weighmentPayload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': weightToken,
+          Cookie: weightCookies,
+        },
+      }
+    );
+
+    const gateEntryPatchPayload = {
+      GrossWeight: grossWeight.toFixed(3),
+      TareWeight: tareWeight.toFixed(3),
+      NetWeight: netWeight.toFixed(3),
+    };
+
+    const { token: headerToken, cookies: headerCookies } = await fetchCsrfToken();
+    const headerPatchResp = await sapAxios.patch(
+      `/YY1_GATEINWARD_OUTWARDDETA(guid'${headerUuid}')`,
+      gateEntryPatchPayload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': headerToken,
+          'If-Match': '*',
+          Cookie: headerCookies,
+        },
+        validateStatus: status => status < 500,
+      }
+    );
+
+    if (headerPatchResp.status >= 400) {
+      return res.status(headerPatchResp.status).json({
+        success: false,
+        message: 'Weighment document was created, but Gate Entry update failed',
+        weighmentDocument: weighmentResp.data?.d?.WeightDocNumber || weightDocNumber,
+        details: headerPatchResp.data,
+      });
+    }
+
+    return res.status(weighmentResp.status).json({
+      success: true,
+      data: {
+        GateEntryNumber: gateEntryNumber,
+        WeightDocNumber: weighmentResp.data?.d?.WeightDocNumber || weightDocNumber,
+        GrossWeight: grossWeight.toFixed(3),
+        TareWeight: tareWeight.toFixed(3),
+        NetWeight: netWeight.toFixed(3),
+        OutwardTime: outwardTime,
+        GateOutDate: currentDate,
+      },
+    });
+  } catch (err) {
+    console.error('ITP weighment create error', err?.response?.status, err?.response?.data || err?.message);
+    return res.status(err?.response?.status || 500).json({
+      success: false,
+      message: err?.response?.data?.error?.message?.value || err?.message || 'Failed to create weighment document',
+    });
+  }
+});
+
+
+function getCurrentIndiaDateTimeParts() {
+  const now = new Date();
+  return {
+    date: now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+    time: now.toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour12: false,
+    }),
+  };
+}
+
+function normalizeSapDateValue(value, fallbackDate) {
+  if (!value) return formatSapODataDate(fallbackDate);
+  if (typeof value === 'string' && value.startsWith('/Date(')) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return formatSapODataDate(trimmed);
+    }
+    if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+      return formatSapODataDate(trimmed.slice(0, 10));
+    }
+  }
+  return formatSapODataDate(value || fallbackDate);
+}
+
+function extractEntityUuid(record) {
+  return record?.SAP_UUID || record?.UUID || record?.Guid || record?.GUID || null;
+}
+
+function parsePositiveDecimal(value) {
+  const parsed = Number.parseFloat(String(value ?? '').replace(/,/g, '').trim());
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
 
 // Example: PATCH /api/headers/material/:docNumber
@@ -1909,9 +2308,45 @@ app.patch('/api/headers/:id', async (req, res) => {
   const body = sanitizePayloadForSapServerSide(req.body);
   try {
 
+    function formatSapODataDateO(date) {
+  if (!date) return null;
+
+  if (typeof date === "string" && date.startsWith("/Date(")) {
+    return date;
+  }
+
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  return `/Date(${d.getTime()})/`;
+}
+
+function formatSapTimeO(timeStr) {
+  if (!timeStr) return null;
+
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
+
+// ✅ INDIA TIME FIX (only this changed)
+const nowO = new Date();
+
+const systemdateO = nowO.toLocaleDateString("en-CA", {
+  timeZone: "Asia/Kolkata"
+});
+
+const systemtimeO = nowO.toLocaleTimeString("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hour12: false
+});
+
     body.VehicleStatus= "OUT";
-    body.OutwardTime = formatSapTime(systemtime);
-    body.GateOutDate = formatSapODataDate(systemdate);
+    body.OutwardTime = formatSapTimeO(systemtimeO);
+    body.GateOutDate = formatSapODataDateO(systemdateO);
     let uuid = id;
     // If id is not a UUID, look up by GateEntryNumber
     if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
@@ -2397,7 +2832,9 @@ app.patch('/api/headers/material/:uuid', async (req, res) => {
     const hasWeightToSync =
       body.GrossWeight !== undefined ||
       body.TareWeight !== undefined ||
-      body.NetWeight !== undefined;
+      body.NetWeight !== undefined ||
+      body.OutwardTime !== undefined ||
+      body.GateOutDate !== undefined;
 
     if (gateEntryNumber && hasWeightToSync) {
       try {
@@ -2413,11 +2850,40 @@ app.patch('/api/headers/material/:uuid', async (req, res) => {
             headerResults[0].Guid ||
             headerResults[0].GUID;
 
-          if (headerUuid) {
+           if (headerUuid) {
+            function formatSapODataDate2(date) {
+            if (!date) return null;
+            if (typeof date === "string" && date.startsWith("/Date(")) {
+            return date;
+            }
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return null;
+            return `/Date(${d.getTime()})/`;
+            }
+            function formatSapTime2(timeStr) {
+             if (!timeStr) return null;
+
+             if (timeStr.startsWith("PT")) {
+            return timeStr;
+            }
+            const [hh, mm, ss] = timeStr.split(":");
+            return `PT${hh}H${mm}M${ss}S`;
+              }
+             // ✅ INDIA TIME FIX (only this changed)
+             const now = new Date();
+             const systemdate2 = now.toLocaleDateString("en-CA", {
+             timeZone: "Asia/Kolkata"
+             });
+             const systemtime2 = now.toLocaleTimeString("en-GB", {
+             timeZone: "Asia/Kolkata",
+             hour12: false
+             });
             const headerPatchBody = {};
             if (body.GrossWeight !== undefined) headerPatchBody.GrossWeight = String(body.GrossWeight);
             if (body.TareWeight !== undefined) headerPatchBody.TareWeight = String(body.TareWeight);
             if (body.NetWeight !== undefined) headerPatchBody.NetWeight = String(body.NetWeight);
+            if (body.OutwardTime !== undefined) headerPatchBody.OutwardTime = formatSapTime2(systemtime2);
+            if (body.GateOutDate !== undefined) headerPatchBody.GateOutDate = formatSapODataDate2(systemdate2);
 
             const { token: headerToken, cookies: headerCookies } = await fetchCsrfToken();
             await sapAxios.patch(
@@ -2800,6 +3266,7 @@ const getNextSalesDocNumber = async (yearInput) => {
 
 // Mutex for atomic number generation
 const salesDocMutex = new Mutex();
+const weightDocMutex = new Mutex();
 
 
 // Initial Registration POST
@@ -3656,6 +4123,7 @@ app.get('/api/sodetails', async (req, res) => {
 
 
 app.post('/api/materialoutward-full', async (req, res) => {
+   await weightDocMutex.runExclusive(async () => {
   try {
     const { outboundDelivery, WeightDocument, TareWeight, FiscalYear, TruckNumber, TruckCapancity, LRGCNumber, permitnumber, Remarks } = req.body;
     console.log('Received request for material outward with payload:', req.body);
@@ -3760,7 +4228,7 @@ const systemtime = now.toLocaleTimeString("en-GB", {
       YY1_TransporterName_DLH: entry.TransporterName,
       YY1_TruckNumber_DLH: entry.VehicleNumber,
       YY1_GateEntryDate_DLH: formatSapODataDate(entry.GateEntryDate),
-      YY1_GateEntryTime_DLH: formatSapTime(entry.GateEntryTime),
+      YY1_GateEntryTime_DLH: formatSapTime(entry.InwardTime),
      // YY1_TareWeight_DLH: entry.TareWeight,
       YY1_WeighbridgeDate_DLH: formatSapODataDate(systemdate),
       YY1_WeighbridgeTime_DLH: formatSapTime(systemtime),
@@ -3770,7 +4238,7 @@ const systemtime = now.toLocaleTimeString("en-GB", {
           {
             ReferenceSDDocument: entry.SalesDocument,
             ReferenceSDDocumentItem: entry.PurchaseOrderItem || '00010',
-            ActualDeliveryQuantity: WeightDocument.TareWeight,
+            ActualDeliveryQuantity: entry.ExpectedQuantity,
             DeliveryQuantityUnit: entry.UOM
           }
         ]
@@ -3888,6 +4356,7 @@ const systemtime = now.toLocaleTimeString("en-GB", {
     const friendlyMsg = parseSapErrorToFriendlyMessage(err);
     res.status(500).json({ success: false, error: friendlyMsg });
   }
+});
 });
 // Fetch CSRF token for Goods Issue OData service
 async function fetchCsrfTokenGoodsIssue() {
@@ -4478,8 +4947,8 @@ if (GateEntryNumber && WeighmentUpdate) {
             }
             const headerPath = `/A_OutbDeliveryHeader(DeliveryDocument='${OutboundDeliveryUpdate.DeliveryDocument}')`;
             const headerPayload = {
-              YY1_WeighbridgeDate_DLH: formatSapODataDate(getResp?.data?.d?.results?.[0]?.GateOutDate),
-              YY1_WeighbridgeTime_DLH: formatSapTime(getResp?.data?.d?.results?.[0]?.OutwardTime),
+              YY1_WeighbridgeDate_DLH: formatSapODataDate(systemdate),
+              YY1_WeighbridgeTime_DLH: formatSapTime(systemtime),
               YY1_WeighbridgeNo_DLH: String(getResp?.data?.d?.results?.[0]?.WeightDocNumber || '').trim(),
               YY1_GrossWeight_DLH: item.GrossWeight,
               YY1_PGIDate_DLH: formatSapODataDate(systemdate),
@@ -4576,17 +5045,30 @@ if (GateEntryNumber && WeighmentUpdate) {
    
  
     console.log('RFID Billing document details:', billingResp?.data);
-          // Only continue if billing creation was successful
+
+//Billing document PDF
+
       if (billingResp.status === 201 || billingResp.status === 200 || billingResp.status === 204) {
         const billingDocNumber = result.billing;
         console.log('Billing Document Number:', billingDocNumber);
+        // if (!billingDocNumber) {
+        //   console.error('Billing document number is missing in response:', billingResp.data);
+        //   return res.status(500).json({
+        //     error: 'Billing document number is missing in SAP response',
+        //     details: billingResp.data
+        //   });
+        // }
+
         if (!billingDocNumber) {
-          console.error('Billing document number is missing in response:', billingResp.data);
-          return res.status(500).json({
-            error: 'Billing document number is missing in SAP response',
-            details: billingResp.data
-          });
-        }
+        console.warn("⚠ Billing not created");
+
+        return res.status(200).json({
+         success: true,
+         message: "RFID Success - Billing not created",
+         goodsIssueNumber: GoodsIssue.DeliveryDocument,
+         billingStatus: "FAILED"
+         });
+         }
         console.log(`✅ Billing document ${billingDocNumber} created`);
         // Respond immediately with billing document number
         res.status(201).json({
@@ -4681,22 +5163,7 @@ if (GateEntryNumber && WeighmentUpdate) {
               console.error('❌ Failed to send billing PDF email:', mailErr);
             }
             console.log(`📄 PDF for ${billingDocNumber} processed in background`);
-// Additionally, send PDF to printer API
-  //      try {
-  //      // Call your own printer API
-  // //   const printResp = await axios.post(
-  // //    "http://localhost:4600/api/printer/print",
-  // // //  "https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print",
-  // //    {
-  // //   pdfBase64: pdfBuffer.toString("base64"),
-  // //   fileName: `Billing_${billingDocNumber}.pdf`
-  // //    }
-  // //    );
-  // //      console.log("✅ Billing PDF sent to printer:", printResp.data);
-  //    } 
-  //    catch (printErr) {
-  //    console.error("❌ Failed to print billing PDF:", printErr?.message);
-  //    }
+
 
      (async () => {
   try {
@@ -4708,33 +5175,6 @@ if (GateEntryNumber && WeighmentUpdate) {
     const weighmentData = getResp?.data?.d?.results?.[0];
 
     console.log("Weighment data:", weighmentData);
-
-    // const slipBuffer = await generateWeighmentSlip({
-    //   WeightDocNumber: weighmentData.WeightDocNumber,
-    //   GateEntryNumber: weighmentData.GateEntryNumber,
-    //   VehicleNumber: weighmentData.VehicleNumber,
-    //   Party: weighmentData.Party,
-    //   Transporter: weighmentData.TransporterCode,
-    //   Material: weighmentData.MaterialDescription,
-    //   GrossWeight: weighmentData.GrossWeight,
-    //   TareWeight: weighmentData.TareWeight,
-    //   NetWeight: weighmentData.NetWeight,
-    //   InwardTime: formatSapTime(weighmentData.InwardTime),
-    //   OutwardTime: formatSapTime(weighmentData.OutwardTime),
-    //   SalesDocument2: weighmentData.SalesDocument2,
-    //   Customer: weighmentData.Customer,
-    //   CustomerName: weighmentData.CustomerName,
-    //   MaterialNumber: weighmentData.Material
-
-    // });
-
-  //  await axios.post("http://localhost:4600/api/printer/print", {
-  //  await axios.post("https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print", {
-   //   pdfBase64: slipBuffer.toString("base64"),
-  //    fileName: `Weighment_${weighmentData.GateEntryNumber}.pdf`
-  //  });
-
-  //  console.log("✅ Weighment slip printed");
 
   } catch (err) {
     console.error("Weighment print error:", err.message);
@@ -4762,64 +5202,6 @@ if (GateEntryNumber && WeighmentUpdate) {
   }
 });
  
-// const PDFDocument = require("pdfkit");
-
-// function generateWeighmentSlip(data) {
-//   return new Promise((resolve) => {
-//     const doc = new PDFDocument({ size: "A4", margin: 30 });
-//     const buffers = [];
-
-//     doc.on("data", buffers.push.bind(buffers));
-//     doc.on("end", () => resolve(Buffer.concat(buffers)));
-
-//     // HEADER
-//     doc.fontSize(16).text("Minera Steel & Power Pvt Ltd", { align: "center" });
-//     doc.fontSize(10).text("Factory Address: Yerabanahalli Village Sandur taluk Ballari", { align: "center" });
-//     doc.moveDown();
-
-//     doc.fontSize(14).text("Weighbridge Ticket", { align: "center" });
-//     doc.moveDown();
-
-//     // DATE & TIME
-//     doc.fontSize(10);
-//     doc.text(`Print Date: ${new Date().toLocaleDateString()}`);
-//     doc.text(`Time: ${new Date().toLocaleTimeString()}`);
-//     doc.moveDown();
-
-//     doc.text("------------------------------------------------------------");
-
-//     // LEFT SIDE
-//     doc.text(`Weighment No : ${data.WeightDocNumber}`);
-//     doc.text(`Gate Entry No: ${data.GateEntryNumber}`);
-//     doc.text(`Truck Number : ${data.VehicleNumber}`);
-//     doc.text(`Transporter  : ${data.Transporter}`);
-
-//     doc.moveDown();
-
-//     // RIGHT SIDE
-//     doc.text(`Customer      : ${data.Customer} - ${data.CustomerName}`);
-//     doc.text(`Material No   : ${data.MaterialNumber}`);
-//     doc.text(`Product      : ${data.Material}`);
-//     doc.text(`Gross Weight : ${data.GrossWeight} t`);
-//     doc.text(`Tare Weight  : ${data.TareWeight} t`);
-//     doc.text(`Net Weight   : ${data.NetWeight} t`);
-
-//     doc.moveDown();
-
-//     // TIME DETAILS
-//     doc.text(`In Time  : ${data.InwardTime}`);
-//     doc.text(`Out Time : ${data.OutwardTime}`);
-
-//     doc.moveDown();
-
-//     doc.text("------------------------------------------------------------");
-//     doc.text("Note: This vehicle weighment includes driver weight");
-
-//     doc.end();
-//   });
-// }
-
-
 
 
 
@@ -5226,23 +5608,6 @@ app.post('/api/create-grn', async (req, res) => {
         }
         console.log(`Fetched gate entry data for ${entryNum}:`, gateResults);
 
-        // //Gate Entry Details Getting based on Gate Entry Number
-        // const filter2 = `$filter=GateEntryNumber eq '${entryNum}'&$format=json`;
-        // const fullUrl2 = `${SAP_BASE}?${filter2}`;
-        // const response2 = await axios.get(fullUrl2, {
-        //   auth: { username: SAP_USER2, password: SAP_PASS2 },
-        //   headers: { Accept: "application/json" }
-        // });
-
-        // const gateResults2 = response2.data?.d?.results || response2.data?.value || [];
-        // const entry2 = gateResults2.find(r => (r.Indicators || "").toUpperCase() === "I");
-        // if (!entry2) {
-        //   results.push({ gateEntryNumber: entryNum, error: "Inward Gate Entry not found" });
-        //   continue;
-        // }
-        // console.log(`Fetched gate entry details2 for ${entryNum}:`, gateResults2);
-
-
         if (!entry.PurchaseOrderNumber || !entry.Material || !entry.NetWeight) {
           results.push({ gateEntryNumber: entryNum, error: "Incomplete Gate Entry data (PO / Material / Qty missing)" });
           continue;
@@ -5263,6 +5628,8 @@ app.post('/api/create-grn', async (req, res) => {
         const item = Array.isArray(items) && items.length > 0 ? items[0] : {};
         console.log('Fetched PO Items:', headerResponse.data, itemResponse.data);
         console.log('Fetched PO Item:', item.PurchaseOrder);
+
+        const specialMaterials = ["1100000012", "1100000043"];
         // Build GRN payload
         const grnPayload = {
           DocumentDate: entry.VendorInvoiceDate,
@@ -5274,8 +5641,8 @@ app.post('/api/create-grn', async (req, res) => {
             results: [
               {
                 Material: entry.Material,
-                Plant: item.Plant || "SID1",
-                StorageLocation: item.StorageLocation || "1101",
+                Plant: item.Plant,
+                StorageLocation: item.StorageLocation,
                 GoodsMovementType: "101",
                 PurchaseOrder: entry.PurchaseOrderNumber,
                 PurchaseOrderItem: item.PurchaseOrderItem,
@@ -5283,9 +5650,15 @@ app.post('/api/create-grn', async (req, res) => {
                 EntryUnit:  item.BaseUnit,
                 //Minimum of NetWeight and VendorInvoiceWeight to avoid excess quantity issues in SAP
                 QuantityInEntryUnit: String(
-                entry.NetWeight < entry.VendorInvoiceWeight 
-                ? entry.NetWeight 
-                : entry.VendorInvoiceWeight),
+                specialMaterials.includes(entry.Material)
+                ? Math.min(
+                Number(entry.NetWeight || 0),
+                Number(entry.VendorInvoiceWeight || 0)
+                )
+                : Number(entry.NetWeight || 0)
+                ),
+                MaterialDocumentLine: "000001",
+                YY1_InvoiceQuantity_MMI: String(entry.VendorInvoiceWeight),
                 UnloadingPointName: entry.TruckNumber,
               }
             ]
@@ -5339,6 +5712,7 @@ app.post('/api/create-grn', async (req, res) => {
       message: "GRN(s) Created",
       results
     });
+    console.log("GRN Creation Results:", results);
 
   } catch (err) {
   const sapError =

@@ -88,6 +88,14 @@ const getUserFriendlyError = (error) => {
 export default function StoresConsumable() {
   const today = new Date().toISOString().split("T")[0];
 
+  const toNumericValue = (value) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const calculateRemainingQty = (availableQty, enteredQty = 0) =>
+    Math.max(toNumericValue(availableQty) - toNumericValue(enteredQty), 0);
+
   /* ================= HEADER STATE ================= */
   const [header, setHeader] = useState({
     GateEntryNumber: "",
@@ -235,13 +243,18 @@ export default function StoresConsumable() {
         ...i,
         PurchaseOrderNumber: poNumber,
         EnteredQty: i.EnteredQty || "",
-        CalculatedRemain: i.RemainQty,
+        BaseRemainQty: toNumericValue(i.RemainQty),
+        CalculatedRemain: calculateRemainingQty(i.RemainQty, i.EnteredQty || 0),
       }));
 
-      // Prevent duplicates: unique by PurchaseOrderNumber + PurchaseOrderItem
+      // Prevent duplicates: unique by PurchaseOrderNumber + PurchaseOrderItem + Material
       setPoItems((prev) => {
-        const existingKeys = new Set(prev.map(i => `${i.PurchaseOrderNumber}__${i.PurchaseOrderItem}`));
-        const filteredNew = newItems.filter(i => !existingKeys.has(`${i.PurchaseOrderNumber}__${i.PurchaseOrderItem}`));
+        const existingKeys = new Set(
+          prev.map(i => `${i.PurchaseOrderNumber}__${i.PurchaseOrderItem}__${i.Material}`)
+        );
+        const filteredNew = newItems.filter(
+          i => !existingKeys.has(`${i.PurchaseOrderNumber}__${i.PurchaseOrderItem}__${i.Material}`)
+        );
         return [...prev, ...filteredNew];
       });
 
@@ -255,9 +268,16 @@ export default function StoresConsumable() {
   };
 
   /* ================= NUMBER INPUT VALIDATION ================= */
+  // Allow numbers with decimals (for quantities)
   const handleNumberInput = (value) => {
-    // Remove any non-digit characters and spaces
-    return value.replace(/[^0-9]/g, '');
+    // Remove invalid characters, allow only digits and one decimal point
+    let cleaned = value.replace(/[^0-9.]/g, '');
+    // Only allow one decimal point
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return cleaned;
   };
 
   /* ================= PHONE NUMBER VALIDATION ================= */
@@ -282,29 +302,34 @@ export default function StoresConsumable() {
   };
 
   /* ================= RECEIVE QTY ================= */
-  // Uniquely update by both PO number and item number
-  const onQtyChange = (poNumber, itemNo, value) => {
+  // Uniquely update by PO number, item number, and material
+  const onQtyChange = (poNumber, itemNo, material, value) => {
     const cleanedValue = handleNumberInput(value);
-    const qty = Number(cleanedValue || 0);
+    const qty = cleanedValue === '' ? 0 : toNumericValue(cleanedValue);
     setPoItems((prev) =>
       prev.map((i) =>
-        i.PurchaseOrderNumber !== poNumber || i.PurchaseOrderItem !== itemNo
+        i.PurchaseOrderNumber !== poNumber || i.PurchaseOrderItem !== itemNo || i.Material !== material
           ? i
-          : qty < 0 || qty > i.RemainQty
+          : qty < 0
           ? i
           : {
               ...i,
               EnteredQty: cleanedValue,
-              CalculatedRemain: i.RemainQty - qty,
+              CalculatedRemain: calculateRemainingQty(i.BaseRemainQty, qty),
             }
       )
     );
   };
 
   /* ================= REMOVE ITEM ================= */
-  const removeItem = (itemNo) => {
+  const removeItem = (poNumber, itemNo, material) => {
     setPoItems((prev) =>
-      prev.filter((i) => i.PurchaseOrderItem !== itemNo)
+      prev.filter(
+        (i) =>
+          i.PurchaseOrderNumber !== poNumber
+          || i.PurchaseOrderItem !== itemNo
+          || i.Material !== material
+      )
     );
   };
 
@@ -363,8 +388,9 @@ export default function StoresConsumable() {
           <td style="border:1px solid #000; padding:4px; text-align:right;">${row.OrderedQty || '-'}</td>
           <td style="border:1px solid #000; padding:4px; text-align:right;">${row.RemainQty || '-'}</td>
           <td style="border:1px solid #000; padding:4px; text-align:right;">${row.EnteredQty || '-'}</td>
+          <td style="border:1px solid #000; padding:4px; text-align:left;">${row.Vendor || '-'}</td>
+          <td style="border:1px solid #000; padding:4px; text-align:left;">${row.VendorName || '-'}</td>
           <td style="border:1px solid #000; padding:4px; text-align:left;">${row.VendorInvoiceNumber || '-'}</td>
-          <td style="border:1px solid #000; padding:4px; text-align:center;">${formatDateValue(row.VendorInvoiceDate)}</td>
         </tr>
       `).join('');
 
@@ -376,7 +402,7 @@ export default function StoresConsumable() {
       ["Driver Name:", getField('driverName'), "Net Weight:", getField('netWeight')],
       ["Driver Phone:", getField('driverPhone'), "DL Number:", getField('dlNumber')],
       ["Person Name:", getField('personName'), "Person Mobile:", getField('personMobile')],
-      ["Invoice No:", getField('handInvoiceNumber'), "Invoice Date:", formatDateValue(getField('handInvoiceDate'))],
+      // ["Invoice No:", getField('handInvoiceNumber'), "Invoice Date:", formatDateValue(getField('handInvoiceDate'))],
       ["E-Way Bill:", getField('eWayBill') ? 'Yes' : 'No', "Status:", 'Created'],
     ];
 
@@ -410,8 +436,9 @@ export default function StoresConsumable() {
               <th style="border:1px solid #000; padding:4px; text-align:right;">Ordered</th>
               <th style="border:1px solid #000; padding:4px; text-align:right;">Remaining</th>
               <th style="border:1px solid #000; padding:4px; text-align:right;">Received</th>
+              <th style="border:1px solid #000; padding:4px; text-align:left;">Vendor</th>
+              <th style="border:1px solid #000; padding:4px; text-align:left;">Vendor Name</th>
               <th style="border:1px solid #000; padding:4px; text-align:left;">Vendor Invoice No</th>
-              <th style="border:1px solid #000; padding:4px; text-align:center;">Vendor Invoice Date</th>
             </tr>
           </thead>
           <tbody>
@@ -590,6 +617,8 @@ export default function StoresConsumable() {
           RemainQty: i.CalculatedRemain,
           VendorInvoiceNumber: i.VendorInvoiceNumber,
           VendorInvoiceDate: i.VendorInvoiceDate,
+          Vendor: i.Vendor,
+          VendorName: i.VendorName,
         });
       }
 
@@ -851,17 +880,19 @@ export default function StoresConsumable() {
                 <td colSpan="10" style={{ fontWeight: 'bold', background: '#f5f5f5' }}>PO: {po}</td>
               </tr>,
               ...items.map((i, idx) => (
-                <tr key={po + '_' + i.PurchaseOrderItem}>
+                <tr key={po + '_' + i.PurchaseOrderItem + '_' + i.Material}>
                   <td>{i.PurchaseOrderItem}</td>
                   <td>{i.Material}</td>
                   <td>{i.OrderedQty}</td>
-                  <td>{i.RemainQty}</td>
+                  <td>{i.CalculatedRemain}</td>
                   <td>
                     <input 
                       className="sc-qty-input" 
                       type="text" 
+                      inputMode="decimal"
+                      pattern="^[0-9]*\.?[0-9]*$"
                       value={i.EnteredQty}
-                      onChange={(e) => onQtyChange(po, i.PurchaseOrderItem, e.target.value)}
+                      onChange={(e) => onQtyChange(po, i.PurchaseOrderItem, i.Material, e.target.value)}
                       placeholder="0"
                     />
                   </td>
@@ -900,7 +931,7 @@ export default function StoresConsumable() {
                   </td>
                   <td>
                     <button className="sc-remove-btn"
-                      onClick={() => removeItem(i.PurchaseOrderItem)}>✖</button>
+                      onClick={() => removeItem(po, i.PurchaseOrderItem, i.Material)}>✖</button>
                   </td>
                 </tr>
               ))
@@ -993,14 +1024,7 @@ export default function StoresConsumable() {
               </div>
             )}
 
-            <button
-              className="sc-primary-btn"
-              type="button"
-              onClick={handlePrintSlip}
-              disabled={printing}
-            >
-              {printing ? "Printing..." : "Print"}
-            </button>
+            {/* Print button hidden as per request */}
 
             <button
               className="sc-primary-btn"

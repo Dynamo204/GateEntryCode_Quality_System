@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
@@ -52,11 +53,11 @@ router.post("/sc-out", async (req, res) => {
 //  const SAP_GATE_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
 //  const SAP_PO_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
 //  const SAP_VENDOR_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
-// Production
+
+ // production
  const SAP_GATE_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
  const SAP_PO_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
  const SAP_VENDOR_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
-
  
 const SAP_GATE_AUTH = {
   username: "BTPINTEGRATION",
@@ -111,6 +112,27 @@ async function fetchCsrf() {
     cookies: res.headers["set-cookie"],
   };
 }
+
+function toNumber(value) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildPoItemKey(poNumber, poItem, material) {
+  return [poNumber, poItem, material].map((part) => String(part || "").trim()).join("__");
+}
+
+function calculateRemainingQuantity(totalPoQuantity, totalReceivedQuantity) {
+  return Math.max(toNumber(totalPoQuantity) - toNumber(totalReceivedQuantity), 0);
+}
+
+function buildReceivedQuantityMap(results = []) {
+  return results.reduce((map, item) => {
+    const key = buildPoItemKey(item.PurchaseOrderNumber, item.PurchaseOrderItem, item.Material);
+    map[key] = (map[key] || 0) + toNumber(item.RecivedQty ?? item.ReceivedQty);
+    return map;
+  }, {});
+}
  
 /* ================= GET ALL PO NUMBERS ================= */
  
@@ -159,27 +181,30 @@ router.get("/po-details", async (req, res) => {
         console.error("VENDOR MASTER ERROR:", vendorErr.response?.data || vendorErr.message);
       }
     }
- 
-    const usedMap = {};
-    usedResp.data.d.results.forEach((i) => {
-      usedMap[i.PurchaseOrderItem] = Number(i.RemainQty);
-    });
+
+    const receivedQtyMap = buildReceivedQuantityMap(usedResp.data?.d?.results || []);
  
     res.json({
       vendor: supplier,
       vendorName,
-      items: poItemsResp.data.value.map((i) => ({
-        PurchaseOrderItem: i.PurchaseOrderItem,
-        Material: i.Material,
-        MaterialDescription: i.PurchaseOrderItemText,
-        OrderedQty: Number(i.OrderQuantity),
-        RemainQty:
-          usedMap[i.PurchaseOrderItem] !== undefined
-            ? usedMap[i.PurchaseOrderItem]
-            : Number(i.OrderQuantity),
-        Vendor: supplier,
-        VendorName: vendorName,
-      })),
+      items: poItemsResp.data.value.map((i) => {
+        const orderedQty = toNumber(i.OrderQuantity);
+        const totalReceivedQty = receivedQtyMap[
+          buildPoItemKey(poNumber, i.PurchaseOrderItem, i.Material)
+        ] || 0;
+        const remainQty = calculateRemainingQuantity(orderedQty, totalReceivedQty);
+
+        return {
+          PurchaseOrderItem: i.PurchaseOrderItem,
+          Material: i.Material,
+          MaterialDescription: i.PurchaseOrderItemText,
+          OrderedQty: orderedQty,
+          TotalReceivedQty: totalReceivedQty,
+          RemainQty: remainQty,
+          Vendor: supplier,
+          VendorName: vendorName,
+        };
+      }),
     });
   } catch (err) {
     console.error(err.response?.data || err.message);
@@ -341,21 +366,56 @@ router.post("/gateentry/item", async (req, res) => {
   try {
     const { token, cookies } = await fetchCsrf();
     const parentUUID = req.body.SAP_PARENT_UUID;
+    const poNumber = req.body.PurchaseOrderNumber;
+    const poItem = req.body.PurchaseOrderItem;
+    const material = req.body.Material;
+    const currentReceivedQty = toNumber(req.body.ReceivedQty);
+
+    const [poItemResp, usedResp] = await Promise.all([
+      sapPO.get(
+        `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}' and PurchaseOrderItem eq '${poItem}'`
+      ),
+      sapGate.get(`/YY1_GATEENTRYITEMS_GATEINWA000?$filter=PurchaseOrderNumber eq '${poNumber}'`),
+    ]);
+
+    const matchedPoItem = (poItemResp.data?.value || []).find(
+      (item) => String(item.PurchaseOrderItem || "").trim() === String(poItem || "").trim()
+        && String(item.Material || "").trim() === String(material || "").trim()
+    );
+
+    if (!matchedPoItem) {
+      return res.status(400).json({ error: "PO item not found for remaining quantity calculation" });
+    }
+
+    const orderedQty = toNumber(matchedPoItem.OrderQuantity);
+    const receivedQtyMap = buildReceivedQuantityMap(usedResp.data?.d?.results || []);
+    const existingReceivedQty = receivedQtyMap[buildPoItemKey(poNumber, poItem, material)] || 0;
+
+    if (currentReceivedQty <= 0) {
+      return res.status(400).json({ error: "Received quantity must be greater than zero" });
+    }
+
+    const newRemainingQty = calculateRemainingQuantity(
+      orderedQty,
+      existingReceivedQty + currentReceivedQty
+    );
  
     await sapGate.post(
       `/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`,
       {
-        PurchaseOrderNumber: req.body.PurchaseOrderNumber,
-        PurchaseOrderItem: req.body.PurchaseOrderItem,
-        Material: req.body.Material,
+        PurchaseOrderNumber: poNumber,
+        PurchaseOrderItem: poItem,
+        Material: material,
         MaterialDescription: req.body.MaterialDescription,
-        RecivedQty: String(req.body.ReceivedQty), // SAP expects 'RecivedQty' (typo in SAP schema)
-        RemainQty: String(req.body.RemainQty),
-        BalanceQty: String(req.body.RemainQty),
+        RecivedQty: String(currentReceivedQty), // SAP expects 'RecivedQty' (typo in SAP schema)
+        RemainQty: String(newRemainingQty),
+        BalanceQty: String(newRemainingQty),
         VendorInvoiceNumber: req.body.VendorInvoiceNumber,
         VendorInvoicedate: req.body.VendorInvoiceDate
           ? `/Date(${new Date(req.body.VendorInvoiceDate).getTime()})/`
           : null,
+        Vendor: req.body.Vendor || "",
+        VendorName: req.body.VendorName || "",
       },
       {
         headers: {
@@ -365,7 +425,7 @@ router.post("/gateentry/item", async (req, res) => {
       }
     );
  
-    res.json({ status: "ITEM_CREATED" });
+    res.json({ status: "ITEM_CREATED", RemainQty: newRemainingQty, BalanceQty: newRemainingQty });
  
   } catch (err) {
     console.error("ITEM ERROR:", err.response?.data || err.message);

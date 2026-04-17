@@ -82,6 +82,9 @@ export default function StoreConsubaleOut() {
     setLoading(false);
   };
 
+  const vendorDisplay = Array.from(new Set(lineItems.map(item => item.Vendor).filter(Boolean))).join(", ") || entryData?.Vendor || "N/A";
+  const vendorNameDisplay = Array.from(new Set(lineItems.map(item => item.VendorName).filter(Boolean))).join(", ") || entryData?.VendorName || "N/A";
+
   const handleSubmit = async (e) => {
 
     e.preventDefault();
@@ -127,15 +130,15 @@ export default function StoreConsubaleOut() {
         {/* Gate Entry */}
         <div className="scout-section">
           <h3>Gate Entry Number</h3>
-          <div className="scout-inline">
+          <div className="scout-inline scout-entry-search">
             <input
-              className="scout-input"
+              className="scout-input scout-gate-entry-input"
               value={gateEntryNumber}
               onChange={(e) => setGateEntryNumber(e.target.value)}
-              placeholder="Enter Gate Entry Number"
+              placeholder="Type Gate Entry Number here"
             />
             <button
-              className="scout-fetch-btn"
+              className="scout-fetch-btn scout-gate-entry-btn"
               onClick={handleFetch}
             >
               {loading ? "Fetching..." : "Fetch Entry Details"}
@@ -194,6 +197,22 @@ export default function StoreConsubaleOut() {
                   className="scout-input"
                   readOnly
                   value={entryData.VehicleNumber || "N/A"}
+                />
+              </div>
+              <div>
+                <label>Vendor</label>
+                <input
+                  className="scout-input"
+                  readOnly
+                  value={vendorDisplay}
+                />
+              </div>
+              <div>
+                <label>Vendor Name</label>
+                <input
+                  className="scout-input"
+                  readOnly
+                  value={vendorNameDisplay}
                 />
               </div>
               <div>

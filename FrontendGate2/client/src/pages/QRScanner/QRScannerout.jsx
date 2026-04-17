@@ -949,7 +949,7 @@ export default function CreateHeader() {
     }
     transporterSearchTimeoutRef.current = setTimeout(() => {
       fetchTransporterDropdown(searchValue, fieldName);
-    }, 250);
+    }, 800);
   };
 
   const handleTransporterFocus = (fieldName) => {
@@ -1005,7 +1005,8 @@ export default function CreateHeader() {
           console.warn('Permit lookup failed', permitNumber, err);
         }
       }
-    }, 300);
+    }, 800);
+    
 
     return () => {
       cancelled = true;
@@ -1045,7 +1046,7 @@ export default function CreateHeader() {
           console.warn('Unable to fetch plant for PO', poNumber, err);
         }
       }
-    }, 300);
+    }, 800);
 
     return () => {
       cancelled = true;
@@ -1608,7 +1609,7 @@ export default function CreateHeader() {
             <div className="form-group" style={{ minWidth: '190px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>TARE WEIGHT (MT)</label>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', minHeight: 0 }}>
-                <input className="form-input" name="TareWeight" value={header.TareWeight === "0.000" ? "" : header.TareWeight} onChange={handleChange} placeholder="Enter or Get Tare" style={{ borderColor: '#0b5ed7', backgroundColor: '#fff', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} inputMode="decimal" />
+                <input className="form-input" name="TareWeight" value={header.TareWeight === "0.000" ? "" : header.TareWeight} onChange={handleChange} readOnly placeholder="Enter or Get Tare" style={{ borderColor: '#0b5ed7', backgroundColor: '#fff', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} inputMode="decimal" />
                 <button type="button" className="btn btn-secondary" onClick={handleGetTareWeight} disabled={tareWeightLoading || loading} style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff', height: 44, minHeight: 40, fontSize: '1.18em', padding: '0 24px', fontWeight: 700 }}>{tareWeightLoading ? 'Getting...' : 'Get Tare'}</button>
               </div>
               <span style={{ fontSize: '0.92em', color: '#888', marginLeft: '2px', marginTop: '4px' }}></span>
@@ -1616,6 +1617,7 @@ export default function CreateHeader() {
 
             <div className="form-group" style={{ minWidth: '160px', marginBottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <label className="form-label" style={{ color: '#0b5ed7', fontWeight: 700, fontSize: '1.08em', marginBottom: 4 }}>GROSS WEIGHT (MT)</label>
+              
               <input className="form-input" name="GrossWeight" value={header.GrossWeight} onChange={handleChange} placeholder="Enter or Get Gross" style={{ borderColor: '#0b5ed7', backgroundColor: '#e0e0e0', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }} inputMode="decimal" disabled />
               <span style={{ fontSize: '0.92em', color: '#a09f9f', marginLeft: '2px', marginTop: '4px' }}></span>
             </div>

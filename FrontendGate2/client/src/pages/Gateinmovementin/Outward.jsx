@@ -57,7 +57,8 @@ export default function Outward() {
     Customer: "",
     CustomerName: "",
     BalanceQty: "",
-    UOM: ""
+    UOM: "",
+    ExpectedQuantity: ""
   });
 
   const [header, setHeader] = useState(createInitialHeaderState());
@@ -138,6 +139,7 @@ export default function Outward() {
           MaterialDescription: item.SalesOrderItemText || prev.MaterialDescription,
           Customer: item.Customer || prev.Customer,
           UOM: item.OrderQuantityUnit || prev.OrderQuantityUnit,
+          ExpectedQuantity: item.ExpectedQuantity || prev.ExpectedQuantity,
           PurchaseOrderItem: item.SalesOrderItem || prev.SalesOrderItem
           // Add more fields as needed
         }));
@@ -196,6 +198,7 @@ function getCustomerNameByNumber(customers, customerNumber) {
       TransporterName: regData.Transporter || '',
       TransporterCode: regData.TransporterCode || '',
       BalanceQty: regData.ExpectedQty || '',
+      ExpectedQuantity: regData.ExpectedQty || '',
       Remarks: regData.SAP_Description || ''
     }));
     setShowSuggestions(false);
@@ -303,6 +306,11 @@ function getCustomerNameByNumber(customers, customerNumber) {
       setLoading(false);
       return;
     }
+    if (!header.ExpectedQuantity) {
+      setError("Expected Quantity is required");
+      setLoading(false);
+      return;
+    }
 
     try {
       // Prepare payload WITHOUT GateEntryNumber (let backend generate it)
@@ -325,7 +333,8 @@ function getCustomerNameByNumber(customers, customerNumber) {
         gateNumber: createdGateNumber,
         vehicle: header.VehicleNumber,
         date: header.GateEntryDate,
-        salesDoc: header.SalesDocument
+        salesDoc: header.SalesDocument,
+        ExpectedQuantity: header.BalanceQty
       });
     } catch (err) {
       const msg = extractErrorMessage(err);
@@ -512,11 +521,6 @@ function getCustomerNameByNumber(customers, customerNumber) {
                 onChange={handleChange}
               />
             </div>
-
-
-
-
-
             <div className="form-group" style={{ display: 'none' }}>
               <label className="form-label">Inward Time (auto)</label>
               <input

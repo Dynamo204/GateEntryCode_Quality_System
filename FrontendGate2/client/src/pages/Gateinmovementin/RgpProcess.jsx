@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import "./RgpProcess.css";
 
 import axios from 'axios';
-import { productSearch, createRgpGateEntry, fetchTransporters, API_BASE } from '../../api';
+import { productSearch, createRgpGateEntry, fetchTransporters, fetchVendorDetails, API_BASE } from '../../api';
 import html2pdf from 'html2pdf.js';
 
 export default function RgpProcess() {
@@ -56,6 +56,11 @@ export default function RgpProcess() {
           const { name, value } = e.target;
           setFormData((prev) => ({ ...prev, [name]: value }));
         };
+
+        const getVendorPlaceValue = (vendor) => {
+          if (!vendor) return "";
+          return vendor.Full_Address || vendor.FullAddress || vendor.VendorPlace || vendor.address || vendor.city || "";
+        };
       // Material code dropdown open/close state
       const [showMaterialDropdownRowId, setShowMaterialDropdownRowId] = useState(null);
 
@@ -97,6 +102,7 @@ export default function RgpProcess() {
   const [copied, setCopied] = useState(false);
   const [savedResponseData, setSavedResponseData] = useState(null);
   const printTriggeredRef = useRef(false);
+  const lastAutoFilledPlaceRef = useRef("");
   const [printStatus, setPrintStatus] = useState("");
   
   // Product/material search state for Plant
@@ -139,8 +145,9 @@ export default function RgpProcess() {
     setLoading(true);
     setError("");
     // Use full backend URL for SAP BTP deployment
-    // fetch('https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/rgpprocess/vendors')
-    fetch('http://localhost:4600/api/rgpprocess/vendors')
+   //  fetch('http://localhost:4600/api/rgpprocess/vendors')
+    //  fetch(`https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/rgpprocess/vendors`)
+       fetch(`https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/rgpprocess/vendors`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch vendor data');
         return res.json();
@@ -184,6 +191,31 @@ export default function RgpProcess() {
     gateEntryNum: "",
     expecteddateofreturn: ""
   });
+
+  useEffect(() => {
+    const matchedVendor = vendorOptions.find((opt) =>
+      (formData.vendor && opt.code === formData.vendor) ||
+      (formData.vendorName && opt.name === formData.vendorName)
+    );
+
+    if (!matchedVendor) return;
+
+    const fetchedPlace = getVendorPlaceValue(matchedVendor);
+    if (!fetchedPlace) return;
+
+    setFormData(prev => {
+      if (prev.place && prev.place !== lastAutoFilledPlaceRef.current) {
+        return prev;
+      }
+      if (prev.place === fetchedPlace) {
+        lastAutoFilledPlaceRef.current = fetchedPlace;
+        return prev;
+      }
+
+      lastAutoFilledPlaceRef.current = fetchedPlace;
+      return { ...prev, place: fetchedPlace };
+    });
+  }, [formData.vendor, formData.vendorName, vendorOptions]);
 
   // Table rows
   const [tableRows, setTableRows] = useState([
@@ -367,7 +399,7 @@ export default function RgpProcess() {
             <td style="border:1px solid #000; padding:4px; text-align:center;">${idx + 1}</td>
             <td style="border:1px solid #000; padding:4px; text-align:center;">${row.type || '-'}</td>
             <td style="border:1px solid #000; padding:4px; text-align:left;">${row.materialCode || '-'}</td>
-            <td style="border:1px solid #000; padding:4px; text-align:left;">${row.materialDescription || '-'}</td>
+            <td style="border:1px solid #000; padding:4px; text-align:left; word-break: break-all; white-space: pre-wrap;">${row.materialDescription || '-'}</td>
             <td style="border:1px solid #000; padding:4px; text-align:right;">${row.returnableQuantity || '-'}</td>
             <td style="border:1px solid #000; padding:4px; text-align:center;">${row.uom || '-'}</td>
             <td style="border:1px solid #000; padding:4px; text-align:right;">${row.approximateValue || '-'}</td>
@@ -397,11 +429,11 @@ export default function RgpProcess() {
       const headerRows = [
         ["Gate Entry No:", gateEntryNum, "Date:", printDate],
         ["Plant:", getField('plant'), "Time:", printTime],
-        ["Vendor:", getField('vendor'), "Vehicle No:", getField('vehicleNumber')],
-        ["Mode of Transport:", getField('modeOfTransport'), "Driver Name:", getField('driverName')],
-        ["Department:", getField('department'), "Requisitioner:", getField('requisitioner')],
-        ["Place:", getField('place'), "Expected Return:", formattedExpectedReturn],
-        ["Remarks:", getField('remarks'), "", ""],
+        ["Vendor Code:", getField('vendor'), "Vendor Name:", getField('vendorName')],
+        ["Vehicle No:", getField('vehicleNumber'), "Mode of Transport:", getField('modeOfTransport')],
+        ["Driver Name:", getField('driverName'), "Department:", getField('department')],
+        ["Requisitioner:", getField('requisitioner'), "Place:", getField('place')],
+        ["Expected Return:", formattedExpectedReturn, "Remarks:", getField('remarks')],
       ];
 
       // Build HTML for PDF (Stores & Consumable style)
@@ -951,22 +983,29 @@ export default function RgpProcess() {
                           key={opt.code + '-' + idx}
                           onMouseDown={async (e) => {
                             e.preventDefault();
+                            const fetchedPlace = getVendorPlaceValue(opt);
+                            lastAutoFilledPlaceRef.current = fetchedPlace;
                             setFormData(prev => ({
                               ...prev,
                               vendor: opt.code,
                               vendorName: opt.name,
-                              place: opt.address || opt.city || ''
+                              place: fetchedPlace
                             }));
                             setShowVendorDropdown(false);
                             if (opt.code) {
                               try {
                                 const { data } = await fetchVendorDetails({ code: opt.code });
-                                if (data.vendor) {
+                                const vendor = Array.isArray(data)
+                                  ? data.find(item => item.code === opt.code)
+                                  : data?.vendor;
+                                const resolvedPlace = getVendorPlaceValue(vendor);
+                                if (vendor) {
+                                  lastAutoFilledPlaceRef.current = resolvedPlace || fetchedPlace;
                                   setFormData(prev => ({
                                     ...prev,
-                                    vendor: data.vendor.VendorCode || '',
-                                    vendorName: data.vendor.VendorName || '',
-                                    place: data.vendor.VendorPlace || '',
+                                    vendor: vendor.code || opt.code || '',
+                                    vendorName: vendor.name || opt.name || '',
+                                    place: resolvedPlace || fetchedPlace || prev.place,
                                   }));
                                 }
                               } catch {}
@@ -1076,22 +1115,29 @@ export default function RgpProcess() {
                           key={opt.code + '-' + idx}
                           onMouseDown={async (e) => {
                             e.preventDefault();
+                            const fetchedPlace = getVendorPlaceValue(opt);
+                            lastAutoFilledPlaceRef.current = fetchedPlace;
                             setFormData(prev => ({
                               ...prev,
                               vendor: opt.code,
                               vendorName: opt.name,
-                              place: opt.address || opt.city || ''
+                              place: fetchedPlace
                             }));
                             setShowVendorNameDropdown(false);
                             if (opt.name) {
                               try {
                                 const { data } = await fetchVendorDetails({ name: opt.name });
-                                if (data.vendor) {
+                                const vendor = Array.isArray(data)
+                                  ? data.find(item => item.name === opt.name)
+                                  : data?.vendor;
+                                const resolvedPlace = getVendorPlaceValue(vendor);
+                                if (vendor) {
+                                  lastAutoFilledPlaceRef.current = resolvedPlace || fetchedPlace;
                                   setFormData(prev => ({
                                     ...prev,
-                                    vendor: data.vendor.VendorCode || '',
-                                    vendorName: data.vendor.VendorName || '',
-                                    place: data.vendor.VendorPlace || '',
+                                    vendor: vendor.code || opt.code || '',
+                                    vendorName: vendor.name || opt.name || '',
+                                    place: resolvedPlace || fetchedPlace || prev.place,
                                   }));
                                 }
                               } catch {}
@@ -1205,7 +1251,7 @@ export default function RgpProcess() {
                   name="place"
                   value={formData.place}
                   onChange={handleInputChange}
-                  placeholder="Enter place"
+                  placeholder="Auto-fetched from vendor, editable if needed"
                   style={{ minHeight: '48px', resize: 'vertical', width: '100%', fontSize: '14px' }}
                 />
               </div>

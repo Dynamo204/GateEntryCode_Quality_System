@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api, { fetchGateEntryByNumber } from "../../api";
+import { createItpWeighment, fetchGateEntryByNumber } from "../../api";
 //import "./GateOutHome.css";
 
 export default function GateEntryOutwardSD() {
@@ -30,25 +30,6 @@ export default function GateEntryOutwardSD() {
       return `${h}:${m}:${s}`;
     }
     return val;
-  };
-
-  // --- GUID extraction ---
-  const extractGuid = (rec) => {
-    if (!rec) return null;
-    return (
-      rec.SAP_UUID ||
-      rec.ID ||
-      rec.Guid ||
-      rec.GUID ||
-      (() => {
-        const idUrl = rec.__metadata?.id || rec.__metadata?.uri;
-        if (idUrl) {
-          const m = String(idUrl).match(/\(guid'([0-9a-fA-F-]{36})'\)/);
-          return m ? m[1] : null;
-        }
-        return null;
-      })()
-    );
   };
 
   // helpers
@@ -118,6 +99,8 @@ export default function GateEntryOutwardSD() {
   const hydrateFromSap = (r = {}) => {
     const base = {
       GateEntryNumber: r.GateEntryNumber || "",
+      Indicators: r.Indicators || "T",
+      Code: "5",
       GateEntryDate: (r.GateEntryDate || "").slice(0, 10) || todayISO,
       VehicleNumber: r.VehicleNumber || r.TruckNumber || r.LorryNumber || "",
       TransporterName: r.TransporterName || r.Transporter || r.CarrierName || "",
@@ -141,6 +124,7 @@ export default function GateEntryOutwardSD() {
   const initialState = {
     GateEntryNumber: "",
     GateEntryDate: todayISO,
+    Indicators: "T",
     VehicleNumber: "",
     TransporterName: "",
     DriverName: "",
@@ -157,13 +141,10 @@ export default function GateEntryOutwardSD() {
 
   const [data, setData] = useState(initialState);
   const [searchNumber, setSearchNumber] = useState("");
-  const [guid, setGuid] = useState(null);
 
   const [grossWeight, setGrossWeight] = useState("");
   const [tareWeight, setTareWeight] = useState("");
   const [netWeight, setNetWeight] = useState("");
-  const [weightLoading, setWeightLoading] = useState(false);
-  // Manual entry for weights removed; always use auto/port/QR fetch
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -184,33 +165,11 @@ export default function GateEntryOutwardSD() {
     }
   }, [grossWeight, tareWeight]);
 
-  // Fetch weight from port/QR scanner (same as QRScannerout)
-  const fetchWeightFromBridge = async (type) => {
-    setWeightLoading(true);
-    try {
-      const { fetchTareWeightFromBridge } = await import("../../api");
-      const response = await fetchTareWeightFromBridge();
-      const payload = response?.data;
-      const rawWeight = payload?.data?.weight;
-      const cleaned = String(rawWeight || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
-      const numberMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
-      const parsedWeight = numberMatch ? numberMatch[0] : '';
-      if (!parsedWeight) throw new Error('Unable to parse weight from weighbridge response');
-      if (type === 'gross') setGrossWeight(parsedWeight);
-      if (type === 'tare') setTareWeight(parsedWeight);
-    } catch (err) {
-      setError(err?.message || 'Failed to get weight');
-    } finally {
-      setWeightLoading(false);
-    }
-  };
-
   const handleLoad = async (e) => {
     e?.preventDefault?.();
     setError(null);
     setResult(null);
     setLoading(true);
-    setGuid(null);
     try {
       const key = (searchNumber || "").trim();
       if (!key) {
@@ -224,20 +183,14 @@ export default function GateEntryOutwardSD() {
         return;
       }
       const rec = results[0];
-      const g = extractGuid(rec);
-      if (!g) {
-        setError("Record GUID not found.");
-        return;
-      }
-      setGuid(g);
       const hydrated = hydrateFromSap(rec);
       // Always set outward time to system time (auto) on load
       hydrated.OutwardTime = hhmmssNow();
       setData(hydrated);
-      // If SAP has weights, prefill them
-      setGrossWeight(rec.GrossWeight || "");
+      // Tare must always come from Gate Entry; gross is new input every time.
       setTareWeight(rec.TareWeight || "");
-      setNetWeight(rec.NetWeight || "");
+      setGrossWeight("");
+      setNetWeight("");
     } catch (err) {
       setError(
         err?.response?.data?.error?.message?.value ||
@@ -255,36 +208,41 @@ export default function GateEntryOutwardSD() {
   const handleSaveOutward = async () => {
     setError(null);
     setResult(null);
-    if (!guid) {
+    if (!data.GateEntryNumber) {
       setError("Load an entry first.");
+      return;
+    }
+
+    const gross = parseFloat(grossWeight);
+    if (!Number.isFinite(gross) || gross <= 0) {
+      setError("Enter a valid Gross Weight.");
       return;
     }
 
     setSaving(true);
     try {
-      // Always use current date for GateOutDate
       const todayISO = new Date().toISOString().split("T")[0];
-      // NetWeight as number (not string)
-      const gross = parseFloat(grossWeight) || 0;
-      const tare = parseFloat(tareWeight) || 0;
-      const net = gross - tare;
-      // Always send OutwardTime in SAP duration format
-      let outwardTimeValue = data.OutwardTime || hhmmssNow();
-      if (!/^PT\d{1,2}H\d{1,2}M\d{1,2}S$/.test(outwardTimeValue)) {
-        outwardTimeValue = hhmmssToSapDuration(outwardTimeValue);
-      }
       const payload = {
-        OutwardTime: outwardTimeValue,
-        GrossWeight: grossWeight,
-        TareWeight: tareWeight,
-        NetWeight: net.toFixed(3),
+        GateEntryNumber: data.GateEntryNumber,
+        OutwardTime: data.OutwardTime || hhmmssNow(),
+        GrossWeight: gross.toFixed(3),
         GateOutDate: todayISO,
-        VehicleStatus: "OUT",
       };
-      const resp = await api.patch(`/headers/${guid}`, payload);
+      const resp = await createItpWeighment(payload);
       if (resp.status >= 200 && resp.status < 300) {
-        setResult("Departure time and weights saved.");
-        // No print slip/download here
+        const saved = resp?.data?.data || {};
+        setData((prev) => ({
+          ...prev,
+          OutwardTime: data.OutwardTime || hhmmssNow(),
+        }));
+        setTareWeight(saved.TareWeight || tareWeight);
+        setNetWeight(saved.NetWeight || netWeight);
+        setResult({
+          message: "Weighment document created and Gate Entry updated.",
+          weightDocNumber: saved.WeightDocNumber || "-",
+          gateEntryNumber: saved.GateEntryNumber || data.GateEntryNumber,
+          outwardTime: data.OutwardTime || hhmmssNow(),
+        });
       } else {
         setError(`Unexpected status ${resp.status}`);
       }
@@ -355,6 +313,10 @@ export default function GateEntryOutwardSD() {
           <div className="form-group">
             <label className="form-label">Outward Time (auto)</label>
             <input className="form-input" value={data.OutwardTime} readOnly style={{ background: '#f0f0f0' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Tare Weight (from Gate Entry)</label>
+            <input className="form-input" value={tareWeight} readOnly style={{ background: '#f0f0f0' }} />
           </div>
         </div>
       </section>
@@ -430,22 +392,13 @@ export default function GateEntryOutwardSD() {
             className="form-input"
             name="GrossWeight"
             value={grossWeight}
-            readOnly
-            style={{ backgroundColor: '#f0f0f0', width: 100 }}
+            onChange={(e) => setGrossWeight(e.target.value)}
+            style={{ width: 100 }}
           />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => fetchWeightFromBridge('gross')}
-            disabled={weightLoading || saving}
-            style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
-          >
-            {weightLoading ? 'Getting...' : 'Get Gross'}
-          </button>
         </div>
         {/* Tare Weight */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <label className="form-label required" style={{ marginBottom: 0 }}>Tare Weight</label>
+          <label className="form-label" style={{ marginBottom: 0 }}>Tare Weight</label>
           <input
             className="form-input"
             name="TareWeight"
@@ -453,15 +406,6 @@ export default function GateEntryOutwardSD() {
             readOnly
             style={{ backgroundColor: '#f0f0f0', width: 100 }}
           />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => fetchWeightFromBridge('tare')}
-            disabled={weightLoading || saving}
-            style={{ whiteSpace: 'nowrap', backgroundColor: '#ff8c00', borderColor: '#ff8c00', color: '#fff' }}
-          >
-            {weightLoading ? 'Getting...' : 'Get Tare'}
-          </button>
         </div>
         {/* Net Weight */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -478,7 +422,7 @@ export default function GateEntryOutwardSD() {
         <button
           type="button"
           onClick={handleSaveOutward}
-          disabled={saving || !guid}
+          disabled={saving || !data.GateEntryNumber}
           className={`btn btn-primary ${saving ? "disabled" : ""}`}
         >
           {saving ? "Saving..." : "Save Departure"}
@@ -497,16 +441,16 @@ export default function GateEntryOutwardSD() {
             <svg viewBox="0 0 24 24" width="24" height="24">
               <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
             </svg>
-            <h3>{result}</h3>
+            <h3>{result.message}</h3>
           </div>
           <div className="success-content">
-            <p>Gate Entry: <strong>{data.GateEntryNumber || "-"}</strong></p>
+            <p>Gate Entry: <strong>{result.gateEntryNumber || data.GateEntryNumber || "-"}</strong></p>
+            <p>Weighment Document: <strong>{result.weightDocNumber || "-"}</strong></p>
             <p>Vehicle: {data.VehicleNumber || "-"}</p>
-            <p>Outward Time: {data.OutwardTime || "-"}</p>
+            <p>Outward Time: {result.outwardTime || data.OutwardTime || "-"}</p>
           </div>
         </div>
       )}
     </div>
   );
 }
-

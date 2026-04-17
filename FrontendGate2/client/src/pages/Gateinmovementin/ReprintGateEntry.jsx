@@ -23,9 +23,9 @@ export default function ReprintGateEntry() {
     setError("");
 
     try {
-     const res = await axios.get("http://localhost:4600/api/weightdetails/all");
+    // const res = await axios.get("http://localhost:4600/api/weightdetails/all");
      // const res = await axios.get("https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
-     //  const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
+       const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
 
       const data = Array.isArray(res.data) ? res.data : [];
       setAllList(data);
@@ -151,12 +151,12 @@ const handlePrint = async () => {
     <div style="display:flex; justify-content:space-between;">
       <div>
         <h2 style="margin:0;">Minera Steel & Power Pvt Ltd</h2>
-        <div style="font-size:12px;">Factory Address: Yerabanahalli, Karnataka</div>
+        <div style="font-size:12px;">Factory Address: Yerabanahalli Village Sandur taluk Ballari dist Pin Code: 583115 Karnataka</div>
       </div>
       ${logo ? `<img src="${logo}" style="height:60px;" />` : ""}
     </div>
 
-    <h3 style="text-align:center;">Weighbridge Ticket (SD)</h3>
+    <h3 style="text-align:center;">Weighbridge Ticket</h3>
 
     <div style="display:flex; justify-content:space-between;">
       <div><b>Date:</b> ${new Date().toLocaleDateString()}</div>
@@ -169,8 +169,8 @@ const handlePrint = async () => {
 
       <table>
         <tr><td><b>Weighment No</b></td><td>: ${f(headerData.WeightDocNumber)}</td></tr>
-        <tr><td><b>Gate Entry</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
-        <tr><td><b>Truck</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
+        <tr><td><b>Gate Entry No</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
+        <tr><td><b>Truck Number</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
         <tr><td><b>Party Code</b></td><td>: ${f(headerData.Customer)}</td></tr>
         <tr><td><b>Transporter Code</b></td><td>: ${f(headerData.TransporterCode)}</td></tr>
         <tr><td><b>Delivery Note</b></td><td>: ${f(headerData.OutboundDelivery)}</td></tr>
@@ -223,12 +223,12 @@ const handlePrint = async () => {
     <div style="display:flex; justify-content:space-between;">
       <div>
         <h2 style="margin:0;">Minera Steel & Power Pvt Ltd</h2>
-        <div style="font-size:12px;">Factory Address: Yerabanahalli, Karnataka</div>
+        <div style="font-size:12px;">Factory Address: Yerabanahalli Village Sandur taluk Ballari dist Pin Code: 583115 Karnataka</div>
       </div>
       ${logo ? `<img src="${logo}" style="height:60px;" />` : ""}
     </div>
 
-    <h3 style="text-align:center;">Weighbridge Ticket (Purchase)</h3>
+    <h3 style="text-align:center;">Weighbridge Ticket</h3>
 
     <div style="display:flex; justify-content:space-between;">
       <div><b>Date:</b> ${new Date().toLocaleDateString()}</div>
@@ -239,27 +239,109 @@ const handlePrint = async () => {
 
     <div style="display:flex; justify-content:space-between;">
 
-      <table>
-        <tr><td><b>Weighment No</b></td><td>: ${f(headerData.WeightDocNumber)}</td></tr>
-        <tr><td><b>Gate Entry</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
-        <tr><td><b>Truck</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
-        <tr><td><b>Party Code</b></td><td>: ${f(headerData.Vendor)}</td></tr>
-        <tr><td><b>Transporter Code</b></td><td>: ${f(headerData.TransporterCode)}</td></tr>
-        <tr><td><b>Challan Number</b></td><td>: ${f(headerData.VendorInvoiceNumber)}</td></tr>
-        <tr><td><b>Challan Weight</b></td><td>: ${f(headerData.VendorInvoiceWeight)}</td></tr>
-        <tr><td><b>Miscellaneous</b></td><td>: ${f(headerData.Remarks)}</td></tr>
-      </table>
+<table>
+  <tr><td><b>Weighment No</b></td><td>: ${f(headerData.WeightDocNumber)}</td></tr>
+  <tr><td><b>Gate Entry No</b></td><td>: ${f(headerData.GateEntryNumber)}</td></tr>
+  <tr><td><b>Truck Number</b></td><td>: ${f(headerData.VehicleNumber)}</td></tr>
+  <tr><td><b>Party Code</b></td><td>: ${f(headerData.Vendor)}</td></tr>
+  <tr><td><b>Transporter Code</b></td><td>: ${f(headerData.TransporterCode)}</td></tr>
+
+  ${headerData.VendorInvoiceNumber && headerData.VendorInvoiceNumber !== "-" ? `
+  <tr><td><b>Challan Number</b></td><td>: ${f(headerData.VendorInvoiceNumber)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceNumber2 && headerData.VendorInvoiceNumber2 !== "-" ? `
+  <tr><td><b>Challan Number2</b></td><td>: ${f(headerData.VendorInvoiceNumber2)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceNumber3 && headerData.VendorInvoiceNumber3 !== "-" ? `
+  <tr><td><b>Challan Number3</b></td><td>: ${f(headerData.VendorInvoiceNumber3)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceNumber4 && headerData.VendorInvoiceNumber4 !== "-" ? `
+  <tr><td><b>Challan Number4</b></td><td>: ${f(headerData.VendorInvoiceNumber4)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceNumber5 && headerData.VendorInvoiceNumber5 !== "-" ? `
+  <tr><td><b>Challan Number5</b></td><td>: ${f(headerData.VendorInvoiceNumber5)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceWeight && headerData.VendorInvoiceWeight !== "0.000" ? `
+  <tr><td><b>Challan Weight</b></td><td>: ${f(headerData.VendorInvoiceWeight)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceWeight2 && headerData.VendorInvoiceWeight2 !== "0.000" ? `
+  <tr><td><b>Challan Weight2</b></td><td>: ${f(headerData.VendorInvoiceWeight2)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceWeight3 && headerData.VendorInvoiceWeight3 !== "0.000" ? `
+  <tr><td><b>Challan Weight3</b></td><td>: ${f(headerData.VendorInvoiceWeight3)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceWeight4 && headerData.VendorInvoiceWeight4 !== "0.000" ? `
+  <tr><td><b>Challan Weight4</b></td><td>: ${f(headerData.VendorInvoiceWeight4)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceWeight5 && headerData.VendorInvoiceWeight5 !== "0.000" ? `
+  <tr><td><b>Challan Weight5</b></td><td>: ${f(headerData.VendorInvoiceWeight5)}</td></tr>
+  ` : ''}
+
+  ${headerData.Remarks && headerData.Remarks !== "-" ? `
+  <tr><td><b>Miscellaneous</b></td><td>: ${f(headerData.Remarks)}</td></tr>
+  ` : ''}
+</table>
 
       <table>
-        <tr><td><b>PO Number</b></td><td>: ${f(headerData.PurchaseOrderNumber)}</td></tr>
-        <tr><td><b>Product Name</b></td><td>: ${f(headerData.MaterialDescription)}</td></tr>
-        <tr><td><b>Party</b></td><td>: ${f(headerData.VendorName)}</td></tr>
-        <tr><td><b>Transporter Name</b></td><td>: ${f(headerData.TransporterName)}</td></tr>
-        <tr><td><b>Challan Date</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate)}</td></tr>
-        <tr><td><b>Sub Transporter Name</b></td><td>: ${f(headerData.SubTransporterName)}</td></tr>
-        <tr><td><b>Shift</b></td><td>: ${getShift(headerData.InwardTime)}</td></tr>
-      </table>
+  ${headerData.PurchaseOrderNumber && headerData.PurchaseOrderNumber !== "-" ? `
+  <tr><td><b>PO Number</b></td><td>: ${f(headerData.PurchaseOrderNumber)}</td></tr>
+  ` : ''}
 
+  ${headerData.PurchaseOrderNumber2 && headerData.PurchaseOrderNumber2 !== "-" ? `
+  <tr><td><b>PO Number2</b></td><td>: ${f(headerData.PurchaseOrderNumber2)}</td></tr>
+  ` : ''}
+
+  ${headerData.PurchaseOrderNumber3 && headerData.PurchaseOrderNumber3 !== "-" ? `
+  <tr><td><b>PO Number3</b></td><td>: ${f(headerData.PurchaseOrderNumber3)}</td></tr>
+  ` : ''}
+
+  ${headerData.PurchaseOrderNumber4 && headerData.PurchaseOrderNumber4 !== "-" ? `
+  <tr><td><b>PO Number4</b></td><td>: ${f(headerData.PurchaseOrderNumber4)}</td></tr>
+  ` : ''}
+
+  ${headerData.PurchaseOrderNumber5 && headerData.PurchaseOrderNumber5 !== "-" ? `
+  <tr><td><b>PO Number5</b></td><td>: ${f(headerData.PurchaseOrderNumber5)}</td></tr>
+  ` : ''}
+
+  <tr><td><b>Product Name</b></td><td>: ${f(headerData.MaterialDescription)}</td></tr>
+  <tr><td><b>Party</b></td><td>: ${f(headerData.VendorName)}</td></tr>
+  <tr><td><b>Transporter Name</b></td><td>: ${f(headerData.TransporterName)}</td></tr>
+
+  ${headerData.VendorInvoiceDate && headerData.VendorInvoiceDate !== "-" ? `
+  <tr><td><b>Challan Date</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceDate2 && headerData.VendorInvoiceDate2 !== "-" ? `
+  <tr><td><b>Challan Date2</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate2)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceDate3 && headerData.VendorInvoiceDate3 !== "-" ? `
+  <tr><td><b>Challan Date3</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate3)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceDate4 && headerData.VendorInvoiceDate4 !== "-" ? `
+  <tr><td><b>Challan Date4</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate4)}</td></tr>
+  ` : ''}
+
+  ${headerData.VendorInvoiceDate5 && headerData.VendorInvoiceDate5 !== "-" ? `
+  <tr><td><b>Challan Date5</b></td><td>: ${formatSAPDate(headerData.VendorInvoiceDate5)}</td></tr>
+  ` : ''}
+
+  ${headerData.SubTransporterName && headerData.SubTransporterName !== "-" ? `
+  <tr><td><b>Sub Transporter Name</b></td><td>: ${f(headerData.SubTransporterName)}</td></tr>
+  ` : ''}
+
+  <tr><td><b>Shift</b></td><td>: ${getShift(headerData.InwardTime)}</td></tr>
+</table>
     </div>
 
     <br/>

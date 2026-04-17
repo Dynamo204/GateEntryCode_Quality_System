@@ -1,6 +1,16 @@
 // Version 6 - Create Gate Entry + Material Inward (Weight Document) together
 import React, { useState, useEffect, useRef } from "react";
-import { createHeader, createMaterialInward, sendEmailNotification, fetchPurchaseOrderByPermitNumber, fetchPurchaseOrderByNumber, transporterDetails, fetchPelletInWeightFromBridge, fetchGateEntryByNumber, fetchWeightDetailsByVendorInvoiceNumber, fetchQRWeightmentSummary } from "../../api";
+import { createHeader, 
+  createMaterialInward, 
+  sendEmailNotification, 
+  fetchPurchaseOrderByPermitNumber, 
+  fetchPurchaseOrderByNumber, 
+  fetchSubTransporterByPurchaseOrder, 
+  transporterDetails, 
+  fetchPelletInWeightFromBridge, 
+  fetchGateEntryByNumber, 
+  fetchWeightDetailsByVendorInvoiceNumber, 
+  fetchQRWeightmentSummary } from "../../api";
 import { useLocation } from "react-router-dom";
 
 
@@ -35,6 +45,7 @@ export default function CreateHeader() {
       GateEntryNumber: "",
       GateEntryDate: currentDate,
       Indicators: "I",
+      Indicators2: "QR",
       VehicleStatus: "IN",
       VehicleNumber: "",
       TransporterCode: "",
@@ -158,7 +169,7 @@ export default function CreateHeader() {
     }
     transporterSearchTimeoutRef.current = setTimeout(() => {
       fetchTransporterDropdown(searchValue, fieldName);
-    }, 250);
+    }, 800);
   };
 
   const handleTransporterFocus = (fieldName) => {
@@ -213,7 +224,7 @@ export default function CreateHeader() {
           console.warn('Permit lookup failed', permitNumber, err);
         }
       }
-    }, 300);
+    }, 800);
 
     return () => {
       cancelled = true;
@@ -293,7 +304,7 @@ export default function CreateHeader() {
           setDuplicateMdpError(null);
         }
       }
-    }, 300);
+    }, 800);
 
     return () => {
       cancelled = true;
@@ -322,10 +333,22 @@ export default function CreateHeader() {
     poLookupTimeoutRef.current = setTimeout(async () => {
       if (cancelled) return;
       try {
-        // Fetch PO details
-        const poResp = await fetchPurchaseOrderByNumber(poNumber);
+        const [poResult, subTransporterResult] = await Promise.allSettled([
+          fetchPurchaseOrderByNumber(poNumber),
+          fetchSubTransporterByPurchaseOrder(poNumber)
+        ]);
+
+        if (poResult.status !== 'fulfilled') {
+          throw poResult.reason;
+        }
+
+        const poResp = poResult.value;
         const items = poResp?.data?.items || poResp?.data?.d?.results || poResp?.data?.value || [];
         const firstItem = items[0] || {};
+        const subTransporterRecord = subTransporterResult.status === 'fulfilled'
+          ? (subTransporterResult.value?.data?.result || subTransporterResult.value?.data?.results?.[0] || null)
+          : null;
+
         // Fetch finalBalance from backend (like QRScannerout)
         let finalBalance = '';
         try {
@@ -334,6 +357,7 @@ export default function CreateHeader() {
         } catch (e) {
           finalBalance = '';
         }
+
         setHeader(prev => {
           if (prev.PurchaseOrderNumber !== poNumber) return prev;
           // Try all possible keys for Material Description
@@ -357,6 +381,9 @@ export default function CreateHeader() {
             MaterialDescription: materialDescription,
             Vendor: firstItem.Vendor || prev.Vendor,
             VendorName: firstItem.VendorName || prev.VendorName,
+            TransporterCode: subTransporterRecord?.MainTransporterCode || prev.TransporterCode,
+            TransporterName: subTransporterRecord?.MainTransporterName || prev.TransporterName,
+            SubTransporterName: subTransporterRecord?.SubTransporterName || prev.SubTransporterName,
             BalanceQty3: firstItem.OrderQuantity || '', // PO Quantity
             BalanceQty: absFinalBalance,
           };
@@ -368,7 +395,7 @@ export default function CreateHeader() {
           Division: '', Material: '', MaterialDescription: '', Vendor: '', VendorName: '', BalanceQty3: '', BalanceQty: '',
         }));
       }
-    }, 400);
+    }, 800);
 
     return () => {
       cancelled = true;
@@ -624,6 +651,7 @@ export default function CreateHeader() {
           WeightDocNumber: updatedHeader.WeightDocNumber,
           FiscalYear: updatedHeader.FiscalYear || currentYear,
           Indicators: 'I',
+          Indicators2: 'QR',
           GateEntryNumber: updatedHeader.GateEntryNumber,
           GateFiscalYear: updatedHeader.FiscalYear || currentYear,
           GateIndicators: 'I',
@@ -994,6 +1022,7 @@ export default function CreateHeader() {
                 name="GrossWeight"
                 value={header.GrossWeight}
                 onChange={handleChange}
+                readOnly
                 placeholder="Enter or Get Gross"
                 inputMode="decimal"
                 style={{ borderColor: '#0b5ed7', backgroundColor: '#fff', height: 44, minHeight: 40, paddingTop: 6, paddingBottom: 6, fontSize: '1.18em', width: '130px' }}
@@ -1151,3 +1180,4 @@ const handleQRRemarks = async (remarks) => {
     Remarks: remarks
   }));
 };
+

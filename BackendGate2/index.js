@@ -10,8 +10,8 @@ app.use(cors()); // Allow all origins for development
 // SAP Credentials
 const SAP_URL =
 //  "https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
-//  "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
-   "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
+  "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
+//   "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
 const SAP_USER = "BTPINTEGRATION";
 const SAP_PASS = "BTPIntegration@1234567890";
 

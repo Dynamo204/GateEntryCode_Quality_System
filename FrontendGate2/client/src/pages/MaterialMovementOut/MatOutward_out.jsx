@@ -13,6 +13,7 @@ import {
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import './MaterialOutHome.css';
+import Outward from '../Gateinmovementin/Outward';
 
 // Helper: ISO timestamp
 const nowIso = (d = new Date()) => d.toISOString();
@@ -28,6 +29,7 @@ const createInitialState = () => {
     GateEntryNumber: '',
     GateFiscalYear: new Date().getFullYear().toString(),
     GateIndicators: 'O',
+    OutwardTime: '',
     
     // SD Fields (instead of PO)
     SalesDocument: '',
@@ -385,6 +387,65 @@ export default function MaterialOutwardTareCapture() {
       return updated;
     });
   };
+
+
+function formatSapODataDate(date) {
+  if (!date) return null;
+
+  if (typeof date === "string" && date.startsWith("/Date(")) {
+    return date;
+  }
+
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  return `/Date(${d.getTime()})/`;
+}
+
+function formatSapTime(timeStr) {
+  if (!timeStr) return null;
+
+  if (timeStr.startsWith("PT")) {
+    return timeStr;
+  }
+
+  const [hh, mm, ss] = timeStr.split(":");
+  return `PT${hh}H${mm}M${ss}S`;
+}
+
+// ✅ SINGLE IST SOURCE (IMPORTANT)
+const now = new Date();
+
+const istDateObj = new Date(
+  now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+);
+
+// ✅ YYYY-MM-DD (for SAP OData)
+const year = istDateObj.getFullYear();
+const month = String(istDateObj.getMonth() + 1).padStart(2, "0");
+const day = String(istDateObj.getDate()).padStart(2, "0");
+
+const systemdate = `${year}-${month}-${day}`;
+
+// ✅ HH:MM:SS
+const hours = String(istDateObj.getHours()).padStart(2, "0");
+const minutes = String(istDateObj.getMinutes()).padStart(2, "0");
+const seconds = String(istDateObj.getSeconds()).padStart(2, "0");
+
+const systemtime = `${hours}:${minutes}:${seconds}`;
+
+// ✅ DD.MM.YYYY (for TextElement)
+function formatDateDDMMYYYY(date) {
+  const d = new Date(date);
+
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+
+  return `${day}.${month}.${year}`;
+}
+
+const formattedDate = formatDateDDMMYYYY(istDateObj);
   // When Gate Entry Number changes, fetch existing Material Outward record
   const handleGateEntryChange = async (e) => {
     const { name, value } = e.target;
@@ -458,6 +519,8 @@ export default function MaterialOutwardTareCapture() {
           ActuallyWeight: outwardRecord.ActuallyWeight || '',
           OutboundDelivery: outwardRecord.OutboundDelivery,
           VehicleStatus:'OUT',
+          OutwardTime: formatSapTime(systemtime),
+          GateOutDate: formatSapODataDate(systemdate),
         }));
 
         setRecordFound(true);
@@ -470,6 +533,8 @@ export default function MaterialOutwardTareCapture() {
       }
     }
   };
+  
+
   
 
 
@@ -499,28 +564,7 @@ const handleGoodsIssue = async () => {
     //   ActualDeliveryQuantity: netWeight,
     //   YY1_GrossWeight_DLH: form.GrossWeight,
     // });
-function formatSapODataDate(date) {
-  if (!date) return null;
-  if (typeof date === 'string' && date.startsWith('/Date(')) return date;
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return null;
-  return `/Date(${d.getTime()})/`;
-}
-function formatSapTime(timeStr) {
-  if (!timeStr) return null;
 
-  // If already SAP format → return as is
-  if (timeStr.startsWith("PT")) {
-    return timeStr;
-  }
-
-  // If normal format → convert
-  const [hh, mm, ss] = timeStr.split(":");
-  return `PT${hh}H${mm}M${ss}S`;
-}
-const now = new Date();
-const systemtime = now.toTimeString().split(" ")[0];
-const systemdate = new Date().toISOString().split("T")[0];
     // 1) Update Outbound Delivery item with Net Weight
 await updateOutboundDelivery(deliveryDoc, itemNumber, {
   item: {
@@ -542,11 +586,11 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-       'http://localhost:4600/api/goodsissue-and-invoice-int',
+     //     'http://localhost:4600/api/goodsissue-and-invoice-int',
      //  'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
-    //    'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+        'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
   //    'https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/goodsissue-and-invoice',
-   //   'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+  //    'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
       { DeliveryDocument: deliveryDoc },
       { responseType: 'arraybuffer', timeout: 60000 } // use arraybuffer for binary
     );

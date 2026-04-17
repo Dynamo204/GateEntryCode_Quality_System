@@ -280,22 +280,22 @@ export default function App() {
         {/* 101 = admin, 102 = mm, 103 = sd */}
         <Route path="/home/initial_registration" element={<ProtectedRoute allowedRoles={["101","102","104"]}><InitialRegistration /></ProtectedRoute>} />
         {/* Gate Entry Home Inward & Outward*/}
-        <Route path="/home/movein" element={<ProtectedRoute allowedRoles={["101","102","103","104","107"]}><MoveINHome /></ProtectedRoute>} />
-        <Route path="/home/create" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><CreateHeader /></ProtectedRoute>} />
-        <Route path="/home/movein/outward" element={<ProtectedRoute allowedRoles={["101","103","104","107"]}><Outward /></ProtectedRoute>} />
-        <Route path="/home/movein/inward" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><CreateHeader /></ProtectedRoute>} />
+        <Route path="/home/movein" element={<ProtectedRoute allowedRoles={["101","102","103","104"]}><MoveINHome /></ProtectedRoute>} />
+        <Route path="/home/create" element={<ProtectedRoute allowedRoles={["101","102","104"]}><CreateHeader /></ProtectedRoute>} />
+        <Route path="/home/movein/outward" element={<ProtectedRoute allowedRoles={["101","103","104"]}><Outward /></ProtectedRoute>} />
+        <Route path="/home/movein/inward" element={<ProtectedRoute allowedRoles={["101","102","104"]}><CreateHeader /></ProtectedRoute>} />
         {/* Weighment1 Home Inward & Outward*/}
-        <Route path="/home/materialin" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MaterialINHome /></ProtectedRoute>} />
-        <Route path="/home/materialinward" element={<ProtectedRoute allowedRoles={["101","102"]}><MaterialInward /></ProtectedRoute>} />
+        <Route path="/home/materialin" element={<ProtectedRoute allowedRoles={["101","102","103","107"]}><MaterialINHome /></ProtectedRoute>} />
+        <Route path="/home/materialinward" element={<ProtectedRoute allowedRoles={["101","102","107"]}><MaterialInward /></ProtectedRoute>} />
         <Route path="/home/materialoutward" element={<ProtectedRoute allowedRoles={["101","103"]}><MaterialOutward /></ProtectedRoute>} />
         {/* Weighment2 Home Inward & Outward*/}
-        <Route path="/home/materialout" element={<ProtectedRoute allowedRoles={["101","102","103"]}><MaterialOutHome /></ProtectedRoute>} />
-        <Route path="/home/materialout_inward" element={<ProtectedRoute allowedRoles={["101","102"]}><MaterialOut_Inward /></ProtectedRoute>} />
+        <Route path="/home/materialout" element={<ProtectedRoute allowedRoles={["101","102","103", "107"]}><MaterialOutHome /></ProtectedRoute>} />
+        <Route path="/home/materialout_inward" element={<ProtectedRoute allowedRoles={["101","102","107"]}><MaterialOut_Inward /></ProtectedRoute>} />
         <Route path="/home/materialout_outward" element={<ProtectedRoute allowedRoles={["101","103"]}><MaterialOut_Outward /></ProtectedRoute>} />
         {/* Complete Gate Out Inward&Outward */}
-        <Route path="/home/moveout" element={<ProtectedRoute allowedRoles={["101","102","103","104","107"]}><MoveOutHome /></ProtectedRoute>} />
-        <Route path="/home/gateout_inward" element={<ProtectedRoute allowedRoles={["101","102","104","107"]}><GateOut_Inward /></ProtectedRoute>} />
-        <Route path="/home/gateout_outward" element={<ProtectedRoute allowedRoles={["101","103","104","107"]}><GateOut_Outward /></ProtectedRoute>} />
+        <Route path="/home/moveout" element={<ProtectedRoute allowedRoles={["101","102","103","104"]}><MoveOutHome /></ProtectedRoute>} />
+        <Route path="/home/gateout_inward" element={<ProtectedRoute allowedRoles={["101","102","104"]}><GateOut_Inward /></ProtectedRoute>} />
+        <Route path="/home/gateout_outward" element={<ProtectedRoute allowedRoles={["101","103","104"]}><GateOut_Outward /></ProtectedRoute>} />
 
         {/* QR Scanner Routes Pallet */}
         <Route path="/home/qrscanner/inward" element={<ProtectedRoute allowedRoles={["101","102","107"]}><QRScannerInward /></ProtectedRoute>} />
@@ -334,7 +334,7 @@ export default function App() {
         {/* Cancel Gate Entry */}
         <Route path="/home/cancel-gate-entry" element={<ProtectedRoute allowedRoles={["101","104"]}><CancelGateEntry /></ProtectedRoute>} />
         <Route path="/home/cancel-weight-doc" element={<ProtectedRoute allowedRoles={["101","104"]}><CancelWeightDocument /></ProtectedRoute>} />
-        <Route path="/home/reprint" element={<ProtectedRoute allowedRoles={["101","104"]}><ReprintGateEntry /></ProtectedRoute>} />
+        <Route path="/home/reprint" element={<ProtectedRoute allowedRoles={["101","104","107"]}><ReprintGateEntry /></ProtectedRoute>} />
         {/* GRN Creation */}
         <Route path="/home/grncreate" element={<ProtectedRoute allowedRoles={["101","102","110"]}><GrnCreateByGateEntry /></ProtectedRoute>} />
 

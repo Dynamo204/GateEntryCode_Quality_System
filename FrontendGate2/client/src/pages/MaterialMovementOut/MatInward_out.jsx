@@ -101,7 +101,7 @@ const createInitialState = () => {
     VendorName4: '',
     VendorName5: '',
     
-    GateEntryDate: todayDateOnly,
+    GateEntryDate: '',
     GateOutDate: todayDateOnly,
     InwardTime: '',
     OutwardTime: '',
@@ -529,6 +529,64 @@ export default function MaterialInwardOut() {
           console.warn('Could not fetch gate entry for InwardTime:', err);
         }
 
+        function formatSapODataDate(date) {
+        if (!date) return null;
+
+        if (typeof date === "string" && date.startsWith("/Date(")) {
+        return date;
+        }
+
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return null;
+
+        return `/Date(${d.getTime()})/`;
+        }
+
+        function formatSapTime(timeStr) {
+        if (!timeStr) return null;
+
+        if (timeStr.startsWith("PT")) {
+        return timeStr;
+        }
+
+        const [hh, mm, ss] = timeStr.split(":");
+        return `PT${hh}H${mm}M${ss}S`;
+       }
+
+       // ✅ SINGLE IST SOURCE (IMPORTANT)
+       const now = new Date();
+
+       const istDateObj = new Date(
+       now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+        );
+
+     // ✅ YYYY-MM-DD (for SAP OData)
+     const year = istDateObj.getFullYear();
+     const month = String(istDateObj.getMonth() + 1).padStart(2, "0");
+     const day = String(istDateObj.getDate()).padStart(2, "0");
+
+     const systemdate = `${year}-${month}-${day}`;
+
+     // ✅ HH:MM:SS
+     const hours = String(istDateObj.getHours()).padStart(2, "0");
+     const minutes = String(istDateObj.getMinutes()).padStart(2, "0");
+     const seconds = String(istDateObj.getSeconds()).padStart(2, "0");
+
+     const systemtime = `${hours}:${minutes}:${seconds}`;
+
+// ✅ DD.MM.YYYY (for TextElement)
+     function formatDateDDMMYYYY(date) {
+     const d = new Date(date);
+
+     const day = String(d.getDate()).padStart(2, "0");
+     const month = String(d.getMonth() + 1).padStart(2, "0");
+     const year = d.getFullYear();
+
+     return `${day}.${month}.${year}`;
+     }
+
+    const formattedDate = formatDateDDMMYYYY(istDateObj);
+
         // Populate form with existing Material Inward data
         setForm(prev => ({
           ...prev,
@@ -543,7 +601,8 @@ export default function MaterialInwardOut() {
           DriverName: inwardRecord.DriverName || '',
           DriverPhoneNumber: inwardRecord.DriverPhoneNumber || '',
           InwardTime: gateEntryInwardTime,
-          OutwardTime: parseSapTimeToHHMMSS(inwardRecord.OutwardTime || ''),
+          OutwardTime: formatSapTime(systemtime) || '',
+          GateOutDate: formatSapODataDate(systemdate) || '',
           LRGCNumber: inwardRecord.LRGCNumber || '',
           PermitNumber: inwardRecord.PermitNumber || '',
           GateFiscalYear: inwardRecord.FiscalYear || inwardRecord.GateFiscalYear || prev.GateFiscalYear,

@@ -1,3 +1,4 @@
+
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
@@ -98,8 +99,8 @@ function pickLatestLineItems(items) {
 }
 
 async function fetchRgpHeaderByGateEntryNumber(gateEntryNumber) {
-  //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+ // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
   const headerPath = `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
   const headerResp = await axios.get(SAP_URL_BASE + headerPath, {
     auth: { username: SAP_USER, password: SAP_PASS },
@@ -108,8 +109,8 @@ async function fetchRgpHeaderByGateEntryNumber(gateEntryNumber) {
 }
 
 async function fetchRgpLineItemsByParentUuid(parentUUID) {
-//  const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+// const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
   const navigationPath = `/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems?$format=json`;
 
   try {
@@ -312,8 +313,8 @@ router.post('/:gateEntryNumber/receive', async (req, res) => {
         updated.push({ Material: receipt.materialKey, status: 'error', error: 'Missing SAP_UUID for PATCH' });
         continue;
       }
-     // const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${sourceItem.SAP_UUID}')`;
-      const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${sourceItem.SAP_UUID}')`;
+        const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${sourceItem.SAP_UUID}')`;
+     // const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${sourceItem.SAP_UUID}')`;
       // Debug: log PATCH payload and URL
       console.log('[DEBUG] PATCH URL:', itemPatchUrl);
       console.log('[DEBUG] PATCH payload:', JSON.stringify(receipt.linePayload, null, 2));
@@ -383,8 +384,9 @@ router.patch('/update-returnableqty/:gateEntryNumber', async (req, res) => {
     let anyError = false;
     for (const item of items) {
       if (item.SAP_UUID && item.ReturnableQty != null) {
-      //  const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
-        const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
+       const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
+       // const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
+      
         // Debug log
         console.log('[DEBUG] PATCH URL:', itemPatchUrl);
         console.log('[DEBUG] PATCH payload (number):', { ReturnableQty: item.ReturnableQty, RemainQty: item.ReturnableQty });
@@ -470,8 +472,8 @@ router.post('/gateout', async (req, res) => {
     }
 
     // Step 1: Fetch header by GateEntryNumber to get SAP_UUID
-   // const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+      const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
    // const SAP_URL_BASE = 
     const headerPath = `/YY1_GATEINWARD_OUTWARDDETA?$filter=GateEntryNumber eq '${GateEntryNumber}'&$format=json`;
     const headerResp = await axios.get(SAP_URL_BASE + headerPath, {
@@ -513,8 +515,8 @@ router.post('/gateout', async (req, res) => {
     if (Array.isArray(items)) {
       for (const item of items) {
         if (item.SAP_UUID && item.ReturnableQty != null) {
-         // const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
-          const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
+          const itemPatchUrl = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
+          // const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(SAP_UUID=guid'${item.SAP_UUID}')`;
           await axios({
             method: 'PATCH',
             url: itemPatchUrl,
@@ -539,8 +541,8 @@ router.post('/gateout', async (req, res) => {
 });
 
 // SAP config for Gate Entry
-//const SAP_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
-const SAP_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
+const SAP_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
+//const SAP_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
 const SAP_USER = 'BTPINTEGRATION';
 const SAP_PASS = 'BTPIntegration@1234567890';
 
@@ -566,8 +568,8 @@ function getFinancialYearPrefixRGP(date = new Date()) {
 // Helper to get the next Gate Entry Number from SAP (read only)
 async function getNextRgpGateEntryNumberFromSAP() {
   const prefix = getFinancialYearPrefixRGP();
-  //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  //const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
   const filter = `startswith(GateEntryNumber,'${prefix}')`;
   const path = `/YY1_GATEINWARD_OUTWARDDETA?$filter=${filter}&$orderby=GateEntryNumber desc&$top=1&$format=json`;
   try {
@@ -636,7 +638,6 @@ router.post('/', async (req, res) => {
     }
 
     // Fix SAP date format for Expecteddateofreturn
-    // Support both key variants from UI/integrations.
     let expectedDateOfReturn = req.body.Expecteddateofreturn || req.body.ExpectedDateOfReturn;
     if (expectedDateOfReturn && /^\d{4}-\d{2}-\d{2}$/.test(expectedDateOfReturn)) {
       expectedDateOfReturn = expectedDateOfReturn + 'T00:00:00';
@@ -648,27 +649,25 @@ router.post('/', async (req, res) => {
       const [h, m] = inwardTimeSAP.split(':');
       inwardTimeSAP = `PT${h}H${m}M00S`;
     } else {
-      // Default to current time if not provided
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
       inwardTimeSAP = `PT${hh}H${mm}M00S`;
     }
 
-    // Extract fields from req.body (not gateOutPayload)
-    const GateEntryNumber = req.body.GateEntryNumber;
-    const VehicleStatus = req.body.VehicleStatus;
-    const OutwardTime = req.body.OutwardTime;
+    // Extract line items from request
     const items = req.body.items || req.body.tableRows || [];
-    // For gate entry creation, VehicleStatus and OutwardTime are not required
-    // Only check for required header fields if needed
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'At least one line item is required. Gate Entry will not be created.' });
+    }
+
     // Prepare header payload for SAP (no material fields)
     const headerPayload = {
       GateEntryNumber: nextGateEntryNumber,
       GateEntryDate: gateEntryDate,
       InwardTime: inwardTimeSAP,
       FiscalYear: req.body.FiscalYear || new Date().getFullYear().toString(),
-      Indicators: 'R', // Inward indicator for RGP
+      Indicators: 'R',
       VehicleNumber: req.body.VehicleNumber || '',
       TransporterCode: req.body.TransporterCode || '',
       TransporterName: req.body.TransporterName || '',
@@ -684,7 +683,6 @@ router.post('/', async (req, res) => {
       Requisitioner: req.body.Requisitioner || '',
       Place: req.body.Place || '',
       Expecteddateofreturn: expectedDateOfReturn || null,
-      // No material fields here
     };
 
     // Get CSRF token
@@ -709,55 +707,61 @@ router.post('/', async (req, res) => {
     const parentUUID = createResp.data?.d?.SAP_UUID || createResp.data?.SAP_UUID;
     if (!parentUUID) {
       return res.status(400).json({ error: 'SAP UUID missing for header' });
-      // Step 3: PATCH each line item with updated ReturnableQty if needed
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          if (item.SAP_UUID && item.ReturnableQty != null) {
-            const itemPatchUrl = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEENTRYITEMS_GATEINWA000(guid'${item.SAP_UUID}')`;
-            await axios({
-              method: 'PATCH',
-              url: itemPatchUrl,
-              auth: { username: SAP_USER, password: SAP_PASS },
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'x-csrf-token': csrfToken,
-                Cookie: cookies.join(';'),
-              },
-              data: { ReturnableQty: item.ReturnableQty },
-            });
-          }
-        }
-      }
     }
 
-    // Table rows from frontend
-    const tableRows = req.body.tableRows || [];
     // Use correct navigation property for line items
-   // const lineItemURL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`;
-    const lineItemURL = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`;
-    for (const row of tableRows) {
-      // Prepare line item payload (fields same as table row)
-      const returnableQty = parseFloat(row.returnableQuantity) || 0;
-      const linePayload = {
-        Material: row.materialCode || '',
-        MaterialDescription: row.materialDescription || '',
-        ReturnableQty: returnableQty.toString(),
-        RemainQty: returnableQty.toString(), // Keep RemainQty same as ReturnableQty at creation time
-        UOM: row.uom || '',
-        ApproximateValue: row.approximateValue || '0.00',
-        Remarks: row.remarks || '',
-        Purpose: row.purpose || '',
-        // Add other fields as needed
-      };
-      await axios.post(lineItemURL, linePayload, {
-        auth: { username: SAP_USER, password: SAP_PASS },
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken,
-          Cookie: cookies.join(';'),
-        },
-      });
+    const lineItemURL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`;
+   // const lineItemURL = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${parentUUID}')/to_GateEntryItems`;
+    for (const row of items) {
+      try {
+        const returnableQty = parseFloat(row.returnableQuantity) || 0;
+        const linePayload = {
+          Material: row.materialCode || '',
+          MaterialDescription: row.materialDescription || '',
+          ReturnableQty: returnableQty.toString(),
+          RemainQty: returnableQty.toString(),
+          UOM: row.uom || '',
+          ApproximateValue: row.approximateValue || '0.00',
+          Remarks: row.remarks || '',
+          Purpose: row.purpose || '',
+        };
+        await axios.post(lineItemURL, linePayload, {
+          auth: { username: SAP_USER, password: SAP_PASS },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-csrf-token': csrfToken,
+            Cookie: cookies.join(';'),
+          },
+        });
+      } catch (lineErr) {
+        // Rollback: delete the header if any line item fails
+        try {
+          await axios.delete(`${SAP_URL}(guid'${parentUUID}')`, {
+            auth: { username: SAP_USER, password: SAP_PASS },
+            headers: {
+              'x-csrf-token': csrfToken,
+              Cookie: cookies.join(';'),
+            },
+          });
+        } catch (delErr) {
+          console.error('[ERROR] Failed to rollback header after line item error:', delErr?.response?.data || delErr.message);
+        }
+        // Try to extract SAP error message and field
+        let errorMsg = 'Failed to create line item. Gate Entry was not created.';
+        let fieldHint = '';
+        const details = lineErr?.response?.data || lineErr.message;
+        if (typeof details === 'object' && details?.error?.message?.value) {
+          errorMsg = details.error.message.value;
+        } else if (typeof details === 'string') {
+          errorMsg = details;
+        }
+        // Try to extract field name from SAP error message
+        const fieldMatch = errorMsg.match(/Property (\w+)/i);
+        if (fieldMatch) {
+          fieldHint = ` (Field: ${fieldMatch[1]})`;
+        }
+        return res.status(500).json({ error: errorMsg + fieldHint, details });
+      }
     }
 
     console.log('[INFO] RGP Gate Entry and line items created successfully:', nextGateEntryNumber);
@@ -772,8 +776,8 @@ router.post('/', async (req, res) => {
 // GET /api/rgpprocess/vendors - fetch vendor list from SAP
 router.get('/vendors', async (req, res) => {
   try {
-   // const SAP_VENDOR_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS/YY1_Vendor_Master?$format=json';
-    const SAP_VENDOR_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS/YY1_Vendor_Master?$format=json';
+     const SAP_VENDOR_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS/YY1_Vendor_Master?$format=json';
+   //const SAP_VENDOR_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS/YY1_Vendor_Master?$format=json';
     const resp = await axios.get(SAP_VENDOR_URL, {
       auth: { username: SAP_USER, password: SAP_PASS }
     });
@@ -794,8 +798,8 @@ router.get('/vendors', async (req, res) => {
 router.get('/:gateEntryNumber', async (req, res) => {
   try {
     const { gateEntryNumber } = req.params;
-    //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+      const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+   // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
     // Use $filter to search by GateEntryNumber field instead of using it as entity key
     const filter = `$filter=GateEntryNumber eq '${gateEntryNumber}'`;
     const path = `/YY1_GATEINWARD_OUTWARDDETA?${filter}&$format=json`;
@@ -826,9 +830,9 @@ router.get('/:gateEntryNumber', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const prefix = getFinancialYearPrefixRGP();
-    //const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  //  const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+    const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+   // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
     const filter = `startswith(GateEntryNumber,'${prefix}')`;
     const path = `/YY1_GATEINWARD_OUTWARDDETA?$filter=${filter}&$orderby=GateEntryNumber desc&$format=json`;
     const resp = await axios.get(SAP_URL_BASE + path, {
@@ -847,8 +851,8 @@ router.get('/:uuid/items', async (req, res) => {
   try {
     const { uuid } = req.params;
     //const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-    const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+    const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+    //const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
 
     // Step 1: Fetch header by SAP_UUID
     const headerPath = `/YY1_GATEINWARD_OUTWARDDETA(guid'${uuid}')?$format=json`;
@@ -875,8 +879,8 @@ router.patch('/:uuid', async (req, res) => {
   try {
     const { uuid } = req.params;
     //const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-   // const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-      const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+      const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+   //const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
     const path = `/YY1_GATEINWARD_OUTWARDDETA(guid'${uuid}')`;
 
     console.log('[INFO] Updating RGP Gate Entry:', uuid);
