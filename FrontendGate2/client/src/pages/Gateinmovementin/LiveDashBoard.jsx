@@ -1,18 +1,25 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
+const AUTO_REFRESH_SECONDS = 60;
+
+function isScreenActive() {
+  return typeof document === "undefined" || document.visibilityState === "visible";
+}
+
 export default function LiveDashBoard() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sales, setSales] = useState({ rows: [], totals: {} });
   const [inward, setInward] = useState({ rows: [], totals: {} });
-  const [seconds, setSeconds] = useState(30);
+  const [seconds, setSeconds] = useState(AUTO_REFRESH_SECONDS);
 
   const fetchData = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:4600/api/material-trucks",
-    //    "https://gateentry-backend.onrender.com/api/material-trucks",
+     //   "http://localhost:4600/api/material-trucks",
+     //   "https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/material-trucks",
+          "https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/material-trucks",
         { params: { fromDate, toDate } }
       );
       setSales(res.data.sales);
@@ -22,22 +29,35 @@ export default function LiveDashBoard() {
     }
   };
 
-  /* ===== Default TODAY + 30 sec refresh ===== */
+  /* ===== Default TODAY + 60 sec refresh ===== */
   useEffect(() => {
     fetchData();
 
-    const refreshInterval = setInterval(() => {
+    const handleScreenActive = () => {
+      if (!isScreenActive()) return;
       fetchData();
-      setSeconds(30);
-    }, 30000);
+      setSeconds(AUTO_REFRESH_SECONDS);
+    };
+
+    const refreshInterval = setInterval(() => {
+      if (!isScreenActive()) return;
+      fetchData();
+      setSeconds(AUTO_REFRESH_SECONDS);
+    }, AUTO_REFRESH_SECONDS * 1000);
 
     const secondInterval = setInterval(() => {
-      setSeconds(s => (s === 0 ? 30 : s - 1));
+      if (!isScreenActive()) return;
+      setSeconds(s => (s === 0 ? AUTO_REFRESH_SECONDS : s - 1));
     }, 1000);
+
+    document.addEventListener("visibilitychange", handleScreenActive);
+    window.addEventListener("focus", handleScreenActive);
 
     return () => {
       clearInterval(refreshInterval);
       clearInterval(secondInterval);
+      document.removeEventListener("visibilitychange", handleScreenActive);
+      window.removeEventListener("focus", handleScreenActive);
     };
   }, []);
 
@@ -45,7 +65,7 @@ export default function LiveDashBoard() {
     <div className="dashboard">
       {/* ===== HEADER ===== */}
       <div className="header">
-        MATERIAL TRUCKS LIVE STATUS : (TODAY)
+        MATERIAL TRUCKS LIVE STATUS (TODAY)
       </div>
 
       {/* ===== FILTER ROW ===== */}
@@ -68,12 +88,12 @@ export default function LiveDashBoard() {
       {/* ===== TABLES ===== */}
       <div className="tables-row">
         <Section
-          title="Sales / Dispatch Trucks Status (SD Materials)"
+          title="Sales / Dispatch Truck Status (SD Materials)"
           data={sales}
         />
 
         <Section
-          title="Inward Trucks Status (Purchase Materials)"
+          title="Inward Truck Status (Purchase Materials)"
           data={inward}
         />
       </div>
@@ -169,11 +189,11 @@ function Section({ title, data }) {
       <table>
         <thead>
           <tr>
-            <th>Type of Mtrls</th>
-            <th>No of Trucks IN</th>
-            <th>No of Trucks OUT</th>
+            <th>Material Type</th>
+            <th>Trucks In</th>
+            <th>Trucks Out</th>
             <th>Net Weight</th>
-            <th>No of Trucks Pending</th>
+            <th>Pending Trucks</th>
           </tr>
         </thead>
         <tbody>

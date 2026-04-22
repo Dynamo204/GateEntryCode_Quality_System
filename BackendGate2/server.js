@@ -75,6 +75,8 @@ const SAP_BASE_InitialRegistration = 'https://my430382-api.s4hana.cloud.sap/sap/
 const SAP_BASE_UserAccess = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
 const SAP_BASE_LiveDashBoard = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
 const SAP_BASE_Transporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+// Masters for Transporter details
+const SAP_BASE_Transporter2 = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTVENDOR_MASTER_CDS';
 const SAP_BASE_SubTransporter = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAINTAINSUBTRANSPORTER_CDS';
 
 const SAP_BASE_PO = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
@@ -94,7 +96,7 @@ const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sa
 
 
 // ================= PRODUCTION =================
-// Uncomment when go-live Date : 01-04-2026
+// Uncomment when go-live Date : 01-04-2026e
 
 
 // const SAP_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
@@ -103,6 +105,8 @@ const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sa
 // const SAP_BASE_UserAccess = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_USERACCESS_CDS';
 // const SAP_BASE_LiveDashBoard = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_LIVEDASHBOARD_CDS';
 // const SAP_BASE_Transporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS';
+// // Masters for Transporter details
+// const SAP_BASE_Transporter2 = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTVENDOR_MASTER_CDS';
 // const SAP_BASE_SubTransporter = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAINTAINSUBTRANSPORTER_CDS';
 
 // const SAP_BASE_PO = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/';
@@ -168,11 +172,18 @@ const sapAxiosLiveDashBoard = axios.create({
   auth:{
     username: SAP_USER,
     password: SAP_PASS
-  }
-})
+}})
 
 const sapAxiosTransporter = axios.create({
   baseURL: SAP_BASE_Transporter,
+  auth: {
+    username: SAP_USER,
+    password: SAP_PASS
+  }
+});
+
+const sapAxiosTransporter2 = axios.create({
+  baseURL: SAP_BASE_Transporter2,
   auth: {
     username: SAP_USER,
     password: SAP_PASS
@@ -717,24 +728,68 @@ app.get('/api/transporterdetails', async (req, res) => {
     return res.status(400).json({ error: 'Missing search parameter' });
   }
   try {
-    // Use substringof for partial search
-    const filter = `substringof('${search.replace(/'/g, "''")}',Transporter)`;
-    const path = `/YY1_TRANSPORTERDETAILS?$filter=${filter}&$format=json`;
-    const resp = await sapAxiosTransporter.get(path);
-    const results = resp.data?.d?.results || [];
+    const isSafeSupplierSearch = /^[A-Za-z0-9-]+$/.test(search) && search.length <= 12;
+    const variants = Array.from(new Set([
+      search,
+      search.toUpperCase(),
+      search.toLowerCase(),
+      search.charAt(0).toUpperCase() + search.slice(1).toLowerCase()
+    ].filter(Boolean)));
+
+    let results = [];
+    for (const variant of variants) {
+      const escapedVariant = variant.replace(/'/g, "''");
+      const filters = [
+        `substringof('${escapedVariant}',SupplierName)`,
+        `substringof('${escapedVariant}',SupplierFullName)`,
+        `substringof('${escapedVariant}',TaxNumber3)`
+      ];
+
+      if (isSafeSupplierSearch) {
+        filters.push(`substringof('${escapedVariant}',Supplier)`);
+      }
+
+      const query = new URLSearchParams({
+        '$filter': filters.join(' or '),
+        '$format': 'json',
+        '$top': '25'
+      }).toString();
+      const path = `/YY1_TransportVendor_Master?${query}`;
+        const resp = await sapAxiosTransporter2.get(path);
+      results = resp.data?.d?.results || [];
+
+      if (results.length) {
+        break;
+      }
+    }
+
     if (!results.length) {
       return res.json({ results: [] });
     }
-    // Map only required fields for frontend
-    const mapped = results.map(t => ({
-      TransporterCode: t.TransporterCode,
-      TransporterName: t.Transporter,
-      Email: t.Email,
-      Email2: t.Email2,
-      TaxNumber3: t.TaxNumber3,
-      Remarks: t.SAP_Description,
-      Remarks2: t.Remarks2
-    }));
+
+    const normalizedSearch = search.toLowerCase();
+    const mapped = results
+      .map(t => ({
+        TransporterCode: t.Supplier,
+        TransporterName: t.SupplierName,
+        Transporter: t.Supplier,
+        Email: t.EmailAddress,
+        Supplier: t.Supplier,
+        SupplierFullName: t.SupplierFullName,
+        TaxNumber3: t.TaxNumber3,
+        Remarks: t.SupplierFullName || '',
+        Remarks2: ''
+      }))
+      .filter(t => {
+        const haystacks = [
+          t.TransporterName,
+          t.SupplierFullName,
+          t.TransporterCode,
+          t.TaxNumber3
+        ];
+        return haystacks.some(value => String(value || '').toLowerCase().includes(normalizedSearch));
+      });
+
     res.json({ results: mapped });
   } catch (err) {
     console.error('Transporter fetch error', err?.response?.data || err.message);
@@ -1254,7 +1309,7 @@ app.get('/api/po/pricing', async (req, res) => {
     // Use the correct SAP OData4 endpoint for PO pricing
    // const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
      const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
-  // const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
+   //const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurOrderItemPricingElement?$filter=PurchaseOrder eq '${poNumber}'`;
     const sapRes = await axios.get(url, {
       headers: {
         "Accept": "application/json"
@@ -1349,6 +1404,7 @@ const systemtime = now.toLocaleTimeString("en-GB", {
   timeZone: "Asia/Kolkata",
   hour12: false
 });
+
 // POST new header (deep insert with items) - Gate Entry
 app.post('/api/headers', async (req, res) => {
   // Only one request at a time can generate and assign a GateEntryNumber
@@ -1358,11 +1414,6 @@ app.post('/api/headers', async (req, res) => {
 
 if (req.body.Indicators === "I") {
  
-
-// const now = new Date();
-
-// const systemdate = now.toISOString().split("T")[0];
-// const systemtime = now.toTimeString().split(" ")[0];
 
 // 🔹 Step 1: Collect POs
 const poNumbers = [
@@ -1379,7 +1430,7 @@ let allPOItems = [];
 for (const po of poNumbers) {
   try {
 //const url = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
-     const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
+    const url = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
   // const url = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFIDPO_CDS/YY1_RFIDPO?$filter=PurchaseOrder eq '${po}'&$format=json`;
 
     const resp = await sapAxios.get(url, {
@@ -1547,22 +1598,40 @@ if (req.body.Indicators === "O") {
       }
     });
 
-//Transporter details can also be fetched here if needed using req.body.TransporterCode and similar approach
-const transporterDetails = "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
+    
+let transporterDetailsResults = [];
 
-//const transporterDetails = "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS?$filter=TransporterCode eq '" + req.body.TransporterCode + "'&$format=json";
+const transporterCode = String(req.body.TransporterCode || '').trim();
 
-    const transporterDetailsResp = await sapAxiosTransporter.get(transporterDetails, {
-     auth: {
-      username: SAP_USER,
-      password: SAP_PASS
+if (transporterCode) {
+  try {
+    const url =
+      "https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS" +
+    //    "https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_TRANSPORTERDETAILS_CDS/YY1_TRANSPORTERDETAILS" +
+      `?$filter=TransporterCode eq '${transporterCode}'&$format=json`;
+
+    const resp = await axios.get(url, {
+      auth: {
+        username: SAP_USER,
+        password: SAP_PASS
       }
     });
- 
-const sodetailsresults = sodetailsresp.data?.d?.results || [];
-const transporterDetailsResults = transporterDetailsResp.data?.d?.results || [];
-const tdr = transporterDetailsResults[0] || {};
 
+    transporterDetailsResults = resp.data?.d?.results || [];
+
+  } catch (err) {
+    console.log("Transporter fetch failed (ignored):", err.message);
+    transporterDetailsResults = [];
+  }
+}
+
+const tdr = transporterDetailsResults[0] || {};
+const sodetailsresults = sodetailsresp.data?.d?.results || [];
+
+
+if (sodetailsresults.length > 0) {
+  soItem2 = sodetailsresults[0];
+}
 console.log('SO details for SalesDocument', req.body.SalesDocument, sodetailsresults);
 console.log('Transporter details for TransporterCode', req.body.TransporterCode, transporterDetailsResults);
  
@@ -1577,7 +1646,7 @@ if (sodetailsresults.length > 0) {
     input.PurchaseOrderItem = soItem.SalesDocumentItem;
   }
   if (!input.TransporterName) {
-    input.TransporterName = tdr.Transporter;
+    input.TransporterName = tdr.TransporterName || tdr.SupplierName || tdr.SupplierFullName;
   }
   if (!input.Material) {
     input.Material = soItem.Product;
@@ -1658,6 +1727,49 @@ if (!code) {
           Cookie: cookies,
         },
       });
+      // Only for Outward
+      //mail
+if (req.body.Indicators === "O") {
+
+ // const soItem = sodetailsresults[0]; // already available above
+  //const customerEmail = soItem2.YY1_SoldtoParty_Email_SDH;
+  const recipients = [
+  soItem2?.YY1_SoldtoParty_Email_BDH,
+  soItem2?.YY1_ShiptoParty_Email_BDH,
+  soItem2?.YY1_AgentEmail_BDH,
+  soItem2?.YY1_Agent_Email_2_BDH,
+  soItem2?.YY1_Agent_Email_3_BDH
+  ].filter(Boolean);
+
+  console.log("recipients:", recipients);
+
+  if (recipients.length > 0) {
+    try {
+    const { transporter, mailConfig } = await getSapTransporter();
+
+    await transporter.sendMail({
+      from: mailConfig.user,
+      to: recipients.join(","), // send to all
+      subject: `Fw: ${input.GateEntryNumber}-Truck Arrived & Loading slip generated`,
+      html: `
+        <h2>As per your message truck arrived for loading</h2>
+        <p><b>Gate Entry Number:</b> ${input.GateEntryNumber}</p>
+        <p><b>Gate entry Date:</b> ${new Date().toLocaleString()}</p>
+        <p><b>Customer Name:</b> ${soItem2?.CustomerName}</p>
+        <p><b>Truck Number:</b> ${req.body.VehicleNumber}</p>
+        <p><b>Material:</b> ${req.body.Material} - ${req.body.MaterialDescription}</p>
+      `
+       });
+
+       console.log("✅ Mail Sent:", recipients);
+      } catch (err) {
+      console.log("⚠️ Mail failed but continuing:", err.message);
+      }
+      } else {
+       console.log("⚠️ No recipients found → skipping mail");
+      }
+   }
+// end mail
       res.status(resp.status).json(resp.data);
     } catch (err) {
       console.error('POST header error', err?.response?.status,
@@ -3547,11 +3659,11 @@ app.post("/api/send-notification", async (req, res) => {
  
     const { transporter, mailConfig } = await getSapTransporter();
  
-    const { gateEntryNumber, weightDocNumber, vehicleNumber, grossWeight, date } = req.body;
- 
+    const { gateEntryNumber, weightDocNumber, vehicleNumber, grossWeight, date, transporterEmail } = req.body;
+   console.log("Gate Entry Mail Checking = ",transporterEmail);
     const mailOptions = {
       from: mailConfig.user, // MUST match SMTP user
-      to: "n.sukumar056@gmail.com",
+      to:  transporterEmail,
       subject: `Gate Entry Created - ${gateEntryNumber}`,
       html: `
         <h2>Gate Entry Created</h2>
@@ -3842,8 +3954,8 @@ app.get('/api/purchaseorder/:poNumber', async (req, res) => {
     const headerPath = `/PurchaseOrder?$filter=PurchaseOrder eq '${poNumber}'&$top=1&$format=json`;
     const itemPath = `/PurchaseOrderItem?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
  //   const rfidPath = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
-   const rfidPath = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
- //   const rfidPath = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
+      const rfidPath = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
+   // const rfidPath = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_PURCHASE_CDS/YY1_RFID_PURCHASE?$filter=PurchaseOrder eq '${poNumber}'&$format=json`;
 
     const [headerResponse, itemResponse, rfidResponse] = await Promise.all([
       sapAxiosPO.get(headerPath),
@@ -4598,47 +4710,57 @@ app.patch('/api/outbounddelivery/:deliveryDocument/items/:itemNumber', async (re
           res.send(pdfBuffer);
           // Send PDF as email attachment (non-blocking for client)
           try {
-  const customerEmail =
-  billingResp.data?.value?.[0]?.YY1_SoldtoParty_Email_BDH ||
-  billingResp.data?.value?.[0]?.YY1_ShiptoParty_Email_BDH;
+            const billingData = billingResp.data?.value?.[0] || {};
+
+            const recipients = [
+                  billingData.YY1_SoldtoParty_Email_BDH,
+                  billingData.YY1_ShiptoParty_Email_BDH,
+                  billingData.YY1_AgentEmail_BDH,
+                  billingData.YY1_Agent_Email_2_BDH,
+                  billingData.YY1_Agent_Email_3_BDH
+                  ].filter(Boolean);
+
+            if (recipients.length === 0) {
+              console.log("❌ No email found in SAP");
+              return;
+            }
+ 
+            const mailConfig = await getMailConfigFromSAP();
+            const transporter = nodemailer.createTransport({
+            host: mailConfig.host,
+            port: mailConfig.port,
+            secure: false,
+            auth: {
+            user: mailConfig.user,
+            pass: mailConfig.pass
+            },
+            tls: {
+           rejectUnauthorized: false
+            }
+           });
  
  
-const mailConfig = await getMailConfigFromSAP();
-const transporter = nodemailer.createTransport({
-  host: mailConfig.host,
-  port: mailConfig.port,
-  secure: false,
-  auth: {
-    user: mailConfig.user,
-    pass: mailConfig.pass
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
- 
- 
-await transporter.sendMail({
-  from: mailConfig.user, // your client mail
-  to: customerEmail, // dynamic customer email
-  subject: `Billing Document PDF - ${billingDocNumber}`,
-  text: `Please find attached the billing document PDF for Billing Document: ${billingDocNumber}`,
-  attachments: [
-    {
-      filename: `Billing_${billingDocNumber}.pdf`,
-      content: pdfBuffer,
-      contentType: 'application/pdf'
-    }
-  ]
-});
+          await transporter.sendMail({
+           from: mailConfig.user, // your client mail
+           to: recipients.join(","), // dynamic customer email
+           subject: `Billing Document PDF - ${billingDocNumber}`,
+           text: `Please find attached the billing document PDF for Billing Document: ${billingDocNumber}`,
+           attachments: [
+           {
+           filename: `Billing_${billingDocNumber}.pdf`,
+           content: pdfBuffer,
+           contentType: 'application/pdf'
+           }
+          ]
+    });
             console.log('✅ Billing PDF emailed successfully');
           } catch (mailErr) {
             console.error('❌ Failed to send billing PDF email:', mailErr);
           }      
-    try {
-       // Call your own printer API
-    const printResp = await axios.post(
-     "http://localhost:4600/api/printer/print",
+         try {
+        // Call your own printer API
+         const printResp = await axios.post(
+         "http://localhost:4600/api/printer/print",
    //"https://gateentry.cfapps.in30.hana.ondemand.com/api/printer/print",
      {
     pdfBase64: pdfBuffer.toString("base64"),
@@ -5129,9 +5251,20 @@ if (GateEntryNumber && WeighmentUpdate) {
             const pdfBuffer = Buffer.from(b64clean, "base64");
             // Send PDF as email attachment
             try {
-              const customerEmail =
-                billingResp.data?.value?.[0]?.YY1_SoldtoParty_Email_BDH ||
-                billingResp.data?.value?.[0]?.YY1_ShiptoParty_Email_BDH;
+            const billingData = billingResp.data?.value?.[0] || {};
+
+            const recipients = [
+                  billingData.YY1_SoldtoParty_Email_BDH,
+                  billingData.YY1_ShiptoParty_Email_BDH,
+                  billingData.YY1_AgentEmail_BDH,
+                  billingData.YY1_Agent_Email_2_BDH,
+                  billingData.YY1_Agent_Email_3_BDH
+                  ].filter(Boolean);
+
+            if (recipients.length === 0) {
+              console.log("❌ No email found in SAP");
+              return;
+            }
               const mailConfig = await getMailConfigFromSAP();
               const transporter = nodemailer.createTransport({
                 host: mailConfig.host,
@@ -5147,7 +5280,7 @@ if (GateEntryNumber && WeighmentUpdate) {
               });
               await transporter.sendMail({
                 from: mailConfig.user,
-                to: customerEmail,
+                to: recipients.join(","),
                 subject: `Billing Document PDF - ${billingDocNumber}`,
                 text: `Please find attached the billing document PDF for Billing Document: ${billingDocNumber}`,
                 attachments: [
@@ -5202,114 +5335,32 @@ if (GateEntryNumber && WeighmentUpdate) {
   }
 });
  
-
-
-
-
-// // GET /api/material-trucks?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD
-//   app.get("/api/material-trucks", async (req, res) => {
-//   let { fromDate, toDate } = req.query;
-
-//   // ✅ Default = TODAY
-//   if (!fromDate || !toDate) {
-//     const today = new Date().toISOString().split("T")[0];
-//     fromDate = today;
-//     toDate = today;
-//   }
-
-//   const filter =
-//     `GateEntryDate ge datetime'${fromDate}T00:00:00' and ` +
-//     `GateEntryDate le datetime'${toDate}T23:59:59'`;
-
-//   try {
-//     const resp = await sapAxiosLiveDashBoard.get(
-//       `/YY1_LiveDashBoard?$filter=${encodeURIComponent(filter)}&$format=json`
-//     );
-
-//     const data = resp.data.d.results || [];
-
-//     res.json({
-//       sales: processData(data, "O"),   // SD
-//       inward: processData(data, "I")   // MM
-//     });
-
-//   } catch (err) {
-//     console.error("SAP ERROR:", err.response?.data || err.message);
-//     res.status(500).json(err.response?.data || err.message);
-//   }
-// });
-
-// /* ================================
-//    DATA PROCESSING
-// ================================ */
-// function processData(data, indicator) {
-//   const map = {};
-//   let totalIn = 0, totalOut = 0, totalWeight = 0;
-
-//   data
-//     .filter(d => d.Indicators === indicator)
-//     .forEach(item => {
-//       const material = item.MaterialDescription || "No Description";
-
-//       if (!map[material]) {
-//         map[material] = {
-//           material,
-//           in: 0,
-//           out: 0,
-//           netWeight: 0
-//         };
-//       }
-
-//       if (item.VehicleStatus === "IN") {
-//         map[material].in++;
-//         totalIn++;
-//       }
-
-//       if (item.VehicleStatus === "OUT") {
-//         map[material].out++;
-//         totalOut++;
-//       }
-
-//       const weight = Number(item.NetWeight || 0);
-//       map[material].netWeight += weight;
-//       totalWeight += weight;
-//     });
-
-//   return {
-//     rows: Object.values(map).map(m => ({
-//       ...m,
-//       pending:  Math.max(m.in - m.out, 0)
-//     })),
-//     totals: {
-//       in: totalIn,
-//       out: totalOut,
-//       pending: Math.max(totalIn - totalOut, 0),
-//       netWeight: totalWeight.toFixed(2)
-//     }
-//   };
-// }
-
-
-// GET /api/material-trucks
+//Live Dashboard - Material Trucks Data with IN/OUT logic and weight
+// GET /api/material-trucks 
 app.get("/api/material-trucks", async (req, res) => {
   
   try {
-    // SAP works in UTC → always use ISO date
+    const requestedFromDate = String(req.query.fromDate || '').trim();
+    const requestedToDate = String(req.query.toDate || '').trim();
     const today = new Date().toISOString().slice(0, 10);
+    const fromDate = requestedFromDate || today;
+    const toDate = requestedToDate || today;
 
-    // Fetch ALL records till today
-    const filter = `GateEntryDate le datetime'${today}T23:59:59'`;
-    console.log('Material Trucks Filter:', filter);
+    const filter =
+      `((GateEntryDate ge datetime'${fromDate}T00:00:00' and GateEntryDate le datetime'${toDate}T23:59:59') or ` +
+      `(GateOutDate ge datetime'${fromDate}T00:00:00' and GateOutDate le datetime'${toDate}T23:59:59'))`;
+   // console.log('Material Trucks Filter:', filter);
 
     const resp = await sapAxiosLiveDashBoard.get(
       `/YY1_LiveDashBoard?$filter=${encodeURIComponent(filter)}&$format=json`
     );
 
     const data = resp.data?.d?.results || [];
+   // console.log('Material Trucks Rows:', data.length, 'From:', fromDate, 'To:', toDate);
 
     res.json({
-      sales: processData(data, "O", today),   // SD
-      inward: processData(data, "I", today)   // MM
+      sales: processData(data, "O", fromDate, toDate),
+      inward: processData(data, "I", fromDate, toDate)
     });
 
   } catch (err) {
@@ -5332,7 +5383,7 @@ function sapDateToYMD(sapDate) {
 /* ================================
    DATA PROCESSING – FINAL LOGIC
 ================================ */
-function processData(data, indicator, today) {
+function processData(data, indicator, fromDate, toDate) {
   const map = {};
   let totalIn = 0;
   let totalOut = 0;
@@ -5349,7 +5400,8 @@ function processData(data, indicator, today) {
 
       // OUT date → SAP usually updates one of these
       const outDate = sapDateToYMD(item.GateOutDate);
-      console.log('EntryDate:', entryDate, 'OutDate:', outDate, 'Today:', today); 
+      const isEntryInRange = entryDate && entryDate >= fromDate && entryDate <= toDate;
+      const isOutInRange = outDate && outDate >= fromDate && outDate <= toDate;
 
       if (!map[material]) {
         map[material] = {
@@ -5363,9 +5415,9 @@ function processData(data, indicator, today) {
       const weight = Number(item.NetWeight || 0);
 
       /* =========================
-         IN LOGIC (ALL DAYS)
+        IN LOGIC (ENTRY DATE RANGE)
       ========================= */
-      if (item.VehicleStatus === "IN") {
+      if (isEntryInRange) {
         map[material].in++;
         map[material].netWeight += weight;
 
@@ -5378,14 +5430,11 @@ function processData(data, indicator, today) {
       ========================= */
       if (
         item.VehicleStatus === "OUT" &&
-        outDate === today &&
-        map[material].out < map[material].in
+        isOutInRange
       ) {
         map[material].out++;
-        map[material].netWeight += weight;
 
         totalOut++;
-        totalWeight += weight;
       }
     });
 

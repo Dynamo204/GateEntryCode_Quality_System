@@ -24,8 +24,8 @@ export default function ReprintGateEntry() {
 
     try {
     // const res = await axios.get("http://localhost:4600/api/weightdetails/all");
-     // const res = await axios.get("https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
-       const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
+      const res = await axios.get("https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
+     //  const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
 
       const data = Array.isArray(res.data) ? res.data : [];
       setAllList(data);

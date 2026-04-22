@@ -85,7 +85,7 @@ const HomePage = () => {
   <div>
     <h1 style={{ marginBottom: 20 }}>Gate Entry Screen</h1>
     <nav className="main-nav">
-      <Link to="/home/livedashboard" className="card-link" style={{ background: 'linear-gradient(135deg, #0061f2 0%, #0040a0 100%)', boxShadow: '0 4px 15px rgba(0,97,242,0.35)' }}>Dashboard</Link>
+      <Link to="/home/livedashboard" className="card-link" style={{ background: 'linear-gradient(135deg, #0061f2 0%, #0040a0 100%)', boxShadow: '0 4px 15px rgba(0,97,242,0.35)' }}>Live Dash Vehicles</Link>
       <Link to="/home/initial_registration" className="card-link" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.35)' }}>Initial Registration</Link>
       <Link to="/home/cancel-gate-entry" className="card-link" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 15px rgba(239,68,68,0.35)' }}>Cancel Gate Entry</Link>
       <Link to="/home/cancel-weight-doc" className="card-link" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', boxShadow: '0 4px 15px rgba(249,115,22,0.35)' }}>Cancel Weight Doc</Link>
