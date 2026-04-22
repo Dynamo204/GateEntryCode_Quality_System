@@ -7,8 +7,8 @@ const router = express.Router();
  
 // SAP config for Gate Entry
 //const SAP_URL = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
-//const SAP_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
- const SAP_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
+const SAP_URL = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
+// const SAP_URL = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA';
 const SAP_USER = 'BTPINTEGRATION';
 const SAP_PASS = 'BTPIntegration@1234567890';
  
@@ -16,8 +16,8 @@ const SAP_PASS = 'BTPIntegration@1234567890';
 // Helper to get the next Gate Entry Number from SAP (read only)
 async function getNextGateEntryNumberFromSAP(prefix = '266') {
  // const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+   const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+ // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
   const filter = `startswith(GateEntryNumber,'${prefix}') and Indicators eq 'CP'`;
   const path = `/YY1_GATEINWARD_OUTWARDDETA?$filter=${encodeURIComponent(filter)}&$orderby=GateEntryNumber desc&$top=1&$format=json`;
   try {
@@ -44,8 +44,8 @@ async function getNextGateEntryNumberFromSAP(prefix = '266') {
 // Helper to check if a Gate Entry Number already exists in SAP
 async function checkGateEntryExists(gateEntryNumber) {
   //const SAP_URL_BASE = 'https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  //const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
-  const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+  const SAP_URL_BASE = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
+ // const SAP_URL_BASE = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS';
   const filter = `GateEntryNumber eq '${gateEntryNumber}'`;
   const path = `/YY1_GATEINWARD_OUTWARDDETA?$filter=${encodeURIComponent(filter)}&$format=json`;
   try {
@@ -282,8 +282,8 @@ router.post('/item', async (req, res) => {
       };
       // Navigation property URL (as in Postman)
     //  const NAV_URL = `https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA%27${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
-    // const NAV_URL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
-      const NAV_URL = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
+     const NAV_URL = `https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
+    //  const NAV_URL = `https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS/YY1_GATEINWARD_OUTWARDDETA(guid'${item.SAP_PARENT_UUID}')/to_GateEntryItems`;
       let csrfToken, cookies;
       try {
         const tokenResp = await axios.get(NAV_URL, {

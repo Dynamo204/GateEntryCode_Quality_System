@@ -50,14 +50,14 @@ router.post("/sc-out", async (req, res) => {
  //const SAP_PO_BASE ="https://my430301-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
  //const SAP_VENDOR_BASE ="https://my430301-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
  // Quality 
-//  const SAP_GATE_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
-//  const SAP_PO_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
-//  const SAP_VENDOR_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
+ const SAP_GATE_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
+ const SAP_PO_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
+ const SAP_VENDOR_BASE ="https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
 
  // production
- const SAP_GATE_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
- const SAP_PO_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
- const SAP_VENDOR_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
+//  const SAP_GATE_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_GATEINWARD_OUTWARDDETA_CDS";
+//  const SAP_PO_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001";
+//  const SAP_VENDOR_BASE ="https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS";
  
 const SAP_GATE_AUTH = {
   username: "BTPINTEGRATION",
