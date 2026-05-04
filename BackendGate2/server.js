@@ -90,7 +90,7 @@ const SAP_BASE_CustomerMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/o
 const SAP_BASE_SupplierMaster = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
 const SAP_BASE_SO2 = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
 const SAP_BASE_MAILIDADDRESSES = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
-const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
+//const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
 
 
 
@@ -120,7 +120,7 @@ const SAP_BASE_REPRINT = 'https://my430382-api.s4hana.cloud.sap/sap/opu/odata/sa
 // const SAP_BASE_SupplierMaster = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_VENDOR_MASTER_CDS';
 // const SAP_BASE_SO2 = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_RFID_SO_CDS';
 // const SAP_BASE_MAILIDADDRESSES = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_MAILIDADDRESSES_CDS';
-// const SAP_BASE_REPRINT = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
+ const SAP_BASE_REPRINT = 'https://my437207-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_REPRINTAPI_CDS';
 
 
 ///********************** SAP CONFIGURATION - UPDATE FOR EACH ENVIRONMENT **/
@@ -510,20 +510,7 @@ function parseDateInput(value) {
   return new Date(value);
 }
 
-// Build prefix based on Indian financial year (April-March)
-// function buildPrefixFromYearAndCode(dateInput, codeInput) {
-//   // dateInput: string (YYYY-MM-DD) or Date object
-//   let date = dateInput ? new Date(dateInput) : new Date();
-//   let year = date.getFullYear();
-//   let month = date.getMonth() + 1; // JS months: 0-11
 
-//   // If before April, use previous year as financial year start
-//   if (month < 4) year = year - 1;
-
-//   const yy = String(year).slice(-2);
-//   const code = String(codeInput);
-//   return `${yy}${code}`;
-// }
 function buildPrefixFromYearAndCode(dateInput, codeInput) {
 
   let date = parseDateInput(dateInput);
@@ -855,100 +842,241 @@ app.get('/api/headers', async (req, res) => {
 });
 
 
-app.get('/api/weightdetails/all', async (req, res) => {
+// app.get('/api/weightdetails/all', async (req, res) => {
+//   try {
+
+//     const pageSize = 200;   // safe limit
+//     let skip = 0;
+//     let allResults = [];
+//     let hasMore = true;
+
+//     while (hasMore) {
+
+//       const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=VehicleStatus eq 'OUT'&$top=${pageSize}&$skip=${skip}&$format=json`;
+
+//       const response = await sapAxiosReprint.get(path);
+
+//       const results = response.data?.d?.results || [];
+
+//       allResults.push(...results);
+
+//       console.log(`Fetched ${results.length} records (skip=${skip})`);
+
+//       // 🔥 STOP CONDITION
+//       if (results.length < pageSize) {
+//         hasMore = false;
+//       } else {
+//         skip += pageSize;
+//       }
+//     }
+
+//     // ================= MAP DATA =================
+//     const finalData = allResults.map(item => ({
+//       GateEntryNumber: item.GateEntryNumber,
+//       WeightDocNumber: item.WeightDocNumber,
+//       VehicleNumber: item.VehicleNumber || "-",
+//       BillingDocument: item.BillingDocument || "-",
+//       GrossWeight: item.GrossWeight || "-",
+//       TareWeight: item.TareWeight || "-",
+//       NetWeight: item.NetWeight || "-",
+//       OutboundDelivery: item.OutboundDelivery || "-",
+//       SalesDocument: item.SalesDocument || "-",
+//       Customer: item.Customer || "-",
+//       CustomerName: item.CustomerName || "-",
+//       TransporterCode: item.TransporterCode || "-",
+//       TransporterName: item.TransporterName || "-",
+//       Vendor: item.Vendor || "-",
+//       VendorName: item.VendorName || "-",
+//       PurchaseOrderNumber: item.PurchaseOrderNumber || "-",
+//       PurchaseOrderNumber2: item.PurchaseOrderNumber2 || "-",
+//       PurchaseOrderNumber3: item.PurchaseOrderNumber3 || "-",
+//       PurchaseOrderNumber4: item.PurchaseOrderNumber4 || "-",
+//       PurchaseOrderNumber5: item.PurchaseOrderNumber5 || "-",
+//       Material: item.Material || "-",
+//       Material2: item.Material2 || "-",
+//       Material3: item.Material3 || "-",
+//       Material4: item.Material4 || "-",
+//       Material5: item.Material5 || "-",
+//       MaterialDescription: item.MaterialDescription || "-",
+//       MaterialDescription2: item.MaterialDescription2 || "-",
+//       MaterialDescription3: item.MaterialDescription3 || "-",
+//       MaterialDescription4: item.MaterialDescription4 || "-",
+//       MaterialDescription5: item.MaterialDescription5 || "-",
+//       VendorInvoiceNumber: item.VendorInvoiceNumber || "-",
+//       VendorInvoiceNumber2: item.VendorInvoiceNumber2 || "-",
+//       VendorInvoiceNumber3: item.VendorInvoiceNumber3 || "-",
+//       VendorInvoiceNumber4: item.VendorInvoiceNumber4 || "-",
+//       VendorInvoiceNumber5: item.VendorInvoiceNumber5 || "-",
+//       VendorInvoiceDate: item.VendorInvoiceDate || "-",
+//       VendorInvoiceDate2: item.VendorInvoiceDate2 || "-",
+//       VendorInvoiceDate3: item.VendorInvoiceDate3 || "-",
+//       VendorInvoiceDate4: item.VendorInvoiceDate4 || "-",
+//       VendorInvoiceDate5: item.VendorInvoiceDate5 || "-",
+//       VendorInvoiceWeight: item.VendorInvoiceWeight || "-",
+//       VendorInvoiceWeight2: item.VendorInvoiceWeight2 || "-",
+//       VendorInvoiceWeight3: item.VendorInvoiceWeight3 || "-",
+//       VendorInvoiceWeight4: item.VendorInvoiceWeight4 || "-",
+//       VendorInvoiceWeight5: item.VendorInvoiceWeight5 || "-",
+//       BalanceQty: item.BalanceQty || "-",
+//       BalanceQty2: item.BalanceQty2 || "-",
+//       BalanceQty3: item.BalanceQty3 || "-",
+//       BalanceQty4: item.BalanceQty4 || "-",
+//       BalanceQty5: item.BalanceQty5 || "-",
+//       InwardTime: item.InwardTime || "-",
+//       OutwardTime: item.OutwardTime || "-",
+//       GateEntryDate: item.GateEntryDate || "-",
+//       GateOutDate: item.GateOutDate || "-",
+//       WeighmentVehicleStatus: item.VehicleStatus || "-",
+//       SAP_CreatedDateTime: item.SAP_CreatedDateTime || "-"
+//     }));
+
+//     console.log('[API] Total records fetched:', finalData.length);
+
+//     res.json(finalData);
+
+//   } catch (err) {
+//     console.error("ERROR:", err?.response?.data || err.message);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// ================= SEARCH + PAGINATION API =================
+// app.get("/api/weightdetails", async (req, res) => {
+//   try {
+//     const {
+//       search = "",
+//       page = 1,
+//       limit = 50
+//     } = req.query;
+
+//     const pageNum = parseInt(page);
+//     const limitNum = parseInt(limit);
+//     const skip = (pageNum - 1) * limitNum;
+
+//     // ================= SAP QUERY =================
+//     let filter = "VehicleStatus eq 'OUT'";
+
+//     if (search) {
+//       filter += ` and substringof('${search}', GateEntryNumber)`;
+//     }
+
+//     const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=${filter}&$top=${limitNum}&$skip=${skip}&$format=json`;
+
+//     const response = await sapAxiosReprint.get(path);
+
+//     const results = response.data?.d?.results || [];
+
+//     // ================= MAP DATA =================
+//     const finalData = results.map(item => ({
+//       GateEntryNumber: item.GateEntryNumber,
+//       WeightDocNumber: item.WeightDocNumber,
+//       VehicleNumber: item.VehicleNumber || "-",
+//       BillingDocument: item.BillingDocument || "-",
+//       GrossWeight: item.GrossWeight || "-",
+//       TareWeight: item.TareWeight || "-",
+//       NetWeight: item.NetWeight || "-",
+//       OutboundDelivery: item.OutboundDelivery || "-",
+//       SalesDocument: item.SalesDocument || "-",
+//       Customer: item.Customer || "-",
+//       CustomerName: item.CustomerName || "-",
+//       TransporterCode: item.TransporterCode || "-",
+//       TransporterName: item.TransporterName || "-",
+//       Vendor: item.Vendor || "-",
+//       VendorName: item.VendorName || "-",
+//       PurchaseOrderNumber: item.PurchaseOrderNumber || "-",
+//       PurchaseOrderNumber2: item.PurchaseOrderNumber2 || "-",
+//       PurchaseOrderNumber3: item.PurchaseOrderNumber3 || "-",
+//       PurchaseOrderNumber4: item.PurchaseOrderNumber4 || "-",
+//       PurchaseOrderNumber5: item.PurchaseOrderNumber5 || "-",
+//       Material: item.Material || "-",
+//       Material2: item.Material2 || "-",
+//       Material3: item.Material3 || "-",
+//       Material4: item.Material4 || "-",
+//       Material5: item.Material5 || "-",
+//       MaterialDescription: item.MaterialDescription || "-",
+//       MaterialDescription2: item.MaterialDescription2 || "-",
+//       MaterialDescription3: item.MaterialDescription3 || "-",
+//       MaterialDescription4: item.MaterialDescription4 || "-",
+//       MaterialDescription5: item.MaterialDescription5 || "-",
+//       VendorInvoiceNumber: item.VendorInvoiceNumber || "-",
+//       VendorInvoiceNumber2: item.VendorInvoiceNumber2 || "-",
+//       VendorInvoiceNumber3: item.VendorInvoiceNumber3 || "-",
+//       VendorInvoiceNumber4: item.VendorInvoiceNumber4 || "-",
+//       VendorInvoiceNumber5: item.VendorInvoiceNumber5 || "-",
+//       VendorInvoiceDate: item.VendorInvoiceDate || "-",
+//       VendorInvoiceDate2: item.VendorInvoiceDate2 || "-",
+//       VendorInvoiceDate3: item.VendorInvoiceDate3 || "-",
+//       VendorInvoiceDate4: item.VendorInvoiceDate4 || "-",
+//       VendorInvoiceDate5: item.VendorInvoiceDate5 || "-",
+//       VendorInvoiceWeight: item.VendorInvoiceWeight || "-",
+//       VendorInvoiceWeight2: item.VendorInvoiceWeight2 || "-",
+//       VendorInvoiceWeight3: item.VendorInvoiceWeight3 || "-",
+//       VendorInvoiceWeight4: item.VendorInvoiceWeight4 || "-",
+//       VendorInvoiceWeight5: item.VendorInvoiceWeight5 || "-",
+//       BalanceQty: item.BalanceQty || "-",
+//       BalanceQty2: item.BalanceQty2 || "-",
+//       BalanceQty3: item.BalanceQty3 || "-",
+//       BalanceQty4: item.BalanceQty4 || "-",
+//       BalanceQty5: item.BalanceQty5 || "-",
+//       InwardTime: item.InwardTime || "-",
+//       OutwardTime: item.OutwardTime || "-",
+//       GateEntryDate: item.GateEntryDate || "-",
+//       GateOutDate: item.GateOutDate || "-",
+//       WeighmentVehicleStatus: item.VehicleStatus || "-",
+//       SAP_CreatedDateTime: item.SAP_CreatedDateTime || "-"
+//     }));
+
+//     console.log(`[API] Page ${pageNum} - Records: ${finalData.length}`);
+
+//     res.json({
+//       page: pageNum,
+//       limit: limitNum,
+//       data: finalData
+//     });
+
+//   } catch (err) {
+//     console.error("ERROR:", err?.response?.data || err.message);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+app.get("/api/weightdetails/initial", async (req, res) => {
   try {
 
-    const pageSize = 200;   // safe limit
-    let skip = 0;
-    let allResults = [];
-    let hasMore = true;
+    const filter = "(Indicators eq 'I' or Indicators eq 'O')";
+    const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=${filter}&$top=50&$format=json`;
 
-    while (hasMore) {
+    const response = await sapAxiosReprint.get(path);
+    const results = response.data?.d?.results || [];
 
-      const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=VehicleStatus eq 'OUT'&$top=${pageSize}&$skip=${skip}&$format=json`;
-
-      const response = await sapAxiosReprint.get(path);
-
-      const results = response.data?.d?.results || [];
-
-      allResults.push(...results);
-
-      console.log(`Fetched ${results.length} records (skip=${skip})`);
-
-      // 🔥 STOP CONDITION
-      if (results.length < pageSize) {
-        hasMore = false;
-      } else {
-        skip += pageSize;
-      }
-    }
-
-    // ================= MAP DATA =================
-    const finalData = allResults.map(item => ({
-      GateEntryNumber: item.GateEntryNumber,
-      WeightDocNumber: item.WeightDocNumber,
-      VehicleNumber: item.VehicleNumber || "-",
-      BillingDocument: item.BillingDocument || "-",
-      GrossWeight: item.GrossWeight || "-",
-      TareWeight: item.TareWeight || "-",
-      NetWeight: item.NetWeight || "-",
-      OutboundDelivery: item.OutboundDelivery || "-",
-      SalesDocument: item.SalesDocument || "-",
-      Customer: item.Customer || "-",
-      CustomerName: item.CustomerName || "-",
-      TransporterCode: item.TransporterCode || "-",
-      TransporterName: item.TransporterName || "-",
-      Vendor: item.Vendor || "-",
-      VendorName: item.VendorName || "-",
-      PurchaseOrderNumber: item.PurchaseOrderNumber || "-",
-      PurchaseOrderNumber2: item.PurchaseOrderNumber2 || "-",
-      PurchaseOrderNumber3: item.PurchaseOrderNumber3 || "-",
-      PurchaseOrderNumber4: item.PurchaseOrderNumber4 || "-",
-      PurchaseOrderNumber5: item.PurchaseOrderNumber5 || "-",
-      Material: item.Material || "-",
-      Material2: item.Material2 || "-",
-      Material3: item.Material3 || "-",
-      Material4: item.Material4 || "-",
-      Material5: item.Material5 || "-",
-      MaterialDescription: item.MaterialDescription || "-",
-      MaterialDescription2: item.MaterialDescription2 || "-",
-      MaterialDescription3: item.MaterialDescription3 || "-",
-      MaterialDescription4: item.MaterialDescription4 || "-",
-      MaterialDescription5: item.MaterialDescription5 || "-",
-      VendorInvoiceNumber: item.VendorInvoiceNumber || "-",
-      VendorInvoiceNumber2: item.VendorInvoiceNumber2 || "-",
-      VendorInvoiceNumber3: item.VendorInvoiceNumber3 || "-",
-      VendorInvoiceNumber4: item.VendorInvoiceNumber4 || "-",
-      VendorInvoiceNumber5: item.VendorInvoiceNumber5 || "-",
-      VendorInvoiceDate: item.VendorInvoiceDate || "-",
-      VendorInvoiceDate2: item.VendorInvoiceDate2 || "-",
-      VendorInvoiceDate3: item.VendorInvoiceDate3 || "-",
-      VendorInvoiceDate4: item.VendorInvoiceDate4 || "-",
-      VendorInvoiceDate5: item.VendorInvoiceDate5 || "-",
-      VendorInvoiceWeight: item.VendorInvoiceWeight || "-",
-      VendorInvoiceWeight2: item.VendorInvoiceWeight2 || "-",
-      VendorInvoiceWeight3: item.VendorInvoiceWeight3 || "-",
-      VendorInvoiceWeight4: item.VendorInvoiceWeight4 || "-",
-      VendorInvoiceWeight5: item.VendorInvoiceWeight5 || "-",
-      BalanceQty: item.BalanceQty || "-",
-      BalanceQty2: item.BalanceQty2 || "-",
-      BalanceQty3: item.BalanceQty3 || "-",
-      BalanceQty4: item.BalanceQty4 || "-",
-      BalanceQty5: item.BalanceQty5 || "-",
-      InwardTime: item.InwardTime || "-",
-      OutwardTime: item.OutwardTime || "-",
-      GateEntryDate: item.GateEntryDate || "-",
-      GateOutDate: item.GateOutDate || "-",
-      WeighmentVehicleStatus: item.VehicleStatus || "-",
-      SAP_CreatedDateTime: item.SAP_CreatedDateTime || "-"
-    }));
-
-    console.log('[API] Total records fetched:', finalData.length);
-
-    res.json(finalData);
+    res.json(results);
 
   } catch (err) {
-    console.error("ERROR:", err?.response?.data || err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/weightdetails/search", async (req, res) => {
+  try {
+
+    const { search = "" } = req.query;
+
+    let cleanedSearch = search.trim();
+
+    let filter = "VehicleStatus eq 'OUT' and (Indicators eq 'I' or Indicators eq 'O')";
+
+    if (cleanedSearch) {
+      filter += ` and startswith(GateEntryNumber,'${cleanedSearch}')`;
+    }
+
+    const path = `/YY1_ReprintAPI?$orderby=GateEntryNumber desc&$filter=${filter}&$top=10&$format=json`;
+
+    const response = await sapAxiosReprint.get(path);
+    const results = response.data?.d?.results || [];
+
+    res.json(results);
+
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -1338,36 +1466,6 @@ app.get('/api/headers/:id/items', async (req, res) => {
 });
 
  
-// function formatSapODataDate(date) {
-//   if (!date) return null;
-
-//   // If already SAP format → return as is
-//   if (typeof date === "string" && date.startsWith("/Date(")) {
-//     return date;
-//   }
-
-//   const d = new Date(date);
-
-//   if (isNaN(d.getTime())) return null;
-
-//   return `/Date(${d.getTime()})/`;
-// }
-
-// function formatSapTime(timeStr) {
-//   if (!timeStr) return null;
-
-//   // If already SAP format → return as is
-//   if (timeStr.startsWith("PT")) {
-//     return timeStr;
-//   }
-
-//   // If normal format → convert
-//   const [hh, mm, ss] = timeStr.split(":");
-//   return `PT${hh}H${mm}M${ss}S`;
-// }
-// const now = new Date();
-// const systemdate = now.toISOString().split("T")[0];
-// const systemtime = now.toTimeString().split(" ")[0];
 
 function formatSapODataDate(date) {
   if (!date) return null;
@@ -1408,6 +1506,11 @@ const systemtime = now.toLocaleTimeString("en-GB", {
 // POST new header (deep insert with items) - Gate Entry
 app.post('/api/headers', async (req, res) => {
   // Only one request at a time can generate and assign a GateEntryNumber
+
+  const nowg = new Date();
+  const systemdateg = nowg.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const systemtimeg = nowg.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false });
+
   await gateNumberMutex.runExclusive(async () => {
     try {
       const input = sanitizePayloadForSapServerSide(req.body);
@@ -1477,9 +1580,9 @@ allPOItems.forEach((poItem, index) => {
 
     input.VehicleStatus = input.VehicleStatus || "IN";
 
-    input.InwardTime = input.InwardTime || formatSapTime(systemtime);
+    input.InwardTime = input.InwardTime || formatSapTime(systemtimeg);
 
-    input.GateEntryDate = input.GateEntryDate || formatSapODataDate(systemdate);
+    input.GateEntryDate = input.GateEntryDate || formatSapODataDate(systemdateg);
   }
 
 });
@@ -1634,6 +1737,7 @@ if (sodetailsresults.length > 0) {
 }
 console.log('SO details for SalesDocument', req.body.SalesDocument, sodetailsresults);
 console.log('Transporter details for TransporterCode', req.body.TransporterCode, transporterDetailsResults);
+console.log('TDR:', tdr);
  
 if (sodetailsresults.length > 0) {
  
@@ -1646,13 +1750,13 @@ if (sodetailsresults.length > 0) {
     input.PurchaseOrderItem = soItem.SalesDocumentItem;
   }
   if (!input.TransporterName) {
-    input.TransporterName = tdr.TransporterName || tdr.SupplierName || tdr.SupplierFullName;
+    input.TransporterName = tdr.Transporter || tdr.SupplierName || tdr.SupplierFullName;
   }
   if (!input.Material) {
     input.Material = soItem.Product;
    }
    if (!input.MaterialDescription) {
-    input.MaterialDescription = soItem.ProductDescription;
+    input.MaterialDescription = soItem.SalesDocumentItemText;
   }
   if (!input.Customer){
     input.Customer = soItem.Customer;
@@ -1662,11 +1766,11 @@ if (sodetailsresults.length > 0) {
   }
   if(!input.InwardTime)
   {
-    input.InwardTime = formatSapTime(systemtime);
+    input.InwardTime = formatSapTime(systemtimeg);
   }
   if(!input.GateEntryDate)
   {
-    input.GateEntryDate = formatSapODataDate(systemdate);
+    input.GateEntryDate = formatSapODataDate(systemdateg);
   }
   if(!input.Status)
   {    input.Status = "Success";}
@@ -1734,11 +1838,11 @@ if (req.body.Indicators === "O") {
  // const soItem = sodetailsresults[0]; // already available above
   //const customerEmail = soItem2.YY1_SoldtoParty_Email_SDH;
   const recipients = [
-  soItem2?.YY1_SoldtoParty_Email_BDH,
-  soItem2?.YY1_ShiptoParty_Email_BDH,
-  soItem2?.YY1_AgentEmail_BDH,
-  soItem2?.YY1_Agent_Email_2_BDH,
-  soItem2?.YY1_Agent_Email_3_BDH
+  soItem2?.YY1_SoldtoParty_Email_SDH,
+  soItem2?.YY1_ShiptoParty_Email_SDH,
+  soItem2?.YY1_AgentEmail_SDH,
+  soItem2?.YY1_Agent_Email_2_SDH,
+  soItem2?.YY1_Agent_Email_3_SDH
   ].filter(Boolean);
 
   console.log("recipients:", recipients);
@@ -1757,7 +1861,7 @@ if (req.body.Indicators === "O") {
         <p><b>Gate entry Date:</b> ${new Date().toLocaleString()}</p>
         <p><b>Customer Name:</b> ${soItem2?.CustomerName}</p>
         <p><b>Truck Number:</b> ${req.body.VehicleNumber}</p>
-        <p><b>Material:</b> ${req.body.Material} - ${req.body.MaterialDescription}</p>
+        <p><b>Material:</b> ${soItem2?.Product} - ${soItem2?.ProductDescription}</p>
       `
        });
 
@@ -5647,6 +5751,23 @@ app.post('/api/create-grn', async (req, res) => {
           auth: { username: SAP_USER2, password: SAP_PASS2 },
           headers: { Accept: "application/json" }
         });
+
+        // 🔍 Check if GRN already exists
+        const checkUrl = `/A_MaterialDocumentHeader?$filter=MaterialDocumentHeaderText eq '${entryNum}'&$top=1`;
+
+        const existingDoc = await sapAxiosGRN.get(checkUrl, {
+          headers: { Accept: "application/json" }
+        });
+
+        const existingResults = existingDoc.data?.value || existingDoc.data?.d?.results || [];
+
+        if (existingResults.length > 0) {
+         results.push({
+         gateEntryNumber: entryNum,
+         error: `GRN already exists for Gate Entry ${entryNum}`
+         });
+         continue; 
+         }
     
 
         const gateResults = response.data?.d?.results || response.data?.value || [];

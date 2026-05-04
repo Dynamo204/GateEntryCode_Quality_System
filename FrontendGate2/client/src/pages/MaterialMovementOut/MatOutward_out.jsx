@@ -586,9 +586,9 @@ await updateOutboundDelivery(deliveryDoc, itemNumber, {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-      //    'http://localhost:4600/api/goodsissue-and-invoice-int',
+          'http://localhost:4600/api/goodsissue-and-invoice-int',
      //  'https://gateentry.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
-        'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
+    //    'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
   //    'https://GateEntry.cfapps.us10-001.hana.ondemand.com/api/goodsissue-and-invoice',
    //   'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/goodsissue-and-invoice-int',
       { DeliveryDocument: deliveryDoc },

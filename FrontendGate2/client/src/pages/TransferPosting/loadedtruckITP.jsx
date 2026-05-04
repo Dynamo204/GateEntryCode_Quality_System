@@ -153,6 +153,7 @@ export default function GateEntryOutwardSD() {
 
   // Keep (no fiscal year logic needed now)
 
+
   // Calculate net weight whenever gross or tare changes
   useEffect(() => {
     const gross = parseFloat(grossWeight) || 0;
@@ -164,6 +165,26 @@ export default function GateEntryOutwardSD() {
       setNetWeight("");
     }
   }, [grossWeight, tareWeight]);
+
+  // Handler for Get Gross button (fetch from weighbridge by IP)
+  const handleGetGrossWeight = async () => {
+    setError(null);
+    try {
+      // Use the same API as emptytruckITP.jsx (adjust function if you have a specific one for gross)
+      const { fetchPelletInWeightFromBridge } = await import("../../api");
+      const response = await fetchPelletInWeightFromBridge();
+      const payload = response?.data;
+      const rawWeight = payload?.data?.weight;
+      // Clean and parse the weight
+      const cleaned = String(rawWeight || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+      const numberMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
+      const parsedWeight = numberMatch ? numberMatch[0] : '';
+      if (!parsedWeight) throw new Error('Unable to parse gross weight from weighbridge response');
+      setGrossWeight(parsedWeight);
+    } catch (err) {
+      setError(err?.message || 'Failed to get gross weight');
+    }
+  };
 
   const handleLoad = async (e) => {
     e?.preventDefault?.();
@@ -395,6 +416,14 @@ export default function GateEntryOutwardSD() {
             onChange={(e) => setGrossWeight(e.target.value)}
             style={{ width: 100 }}
           />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleGetGrossWeight}
+            style={{ minWidth: 90 }}
+          >
+            Get Gross
+          </button>
         </div>
         {/* Tare Weight */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

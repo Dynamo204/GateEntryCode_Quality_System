@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import html2pdf from "html2pdf.js";
 import axios from "axios";
 
@@ -8,86 +8,103 @@ export default function ReprintGateEntry() {
   const [headerData, setHeaderData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [allList, setAllList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
-  const [showList, setShowList] = useState(false);
 
-  // ================= LOAD ALL DATA ONCE =================
+  const timerRef = useRef(null);
+
+  // ================= INITIAL LOAD =================
   useEffect(() => {
-    fetchAllData();
+    loadInitial();
   }, []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    setError("");
-
+  const loadInitial = async () => {
     try {
-    // const res = await axios.get("http://localhost:4600/api/weightdetails/all");
-      const res = await axios.get("https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
-     //  const res = await axios.get("https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/all");
+      setLoading(true);
 
-      const data = Array.isArray(res.data) ? res.data : [];
-      setAllList(data);
-      setFilteredList(data);
-    } catch (err) {
-      console.log(err);
+      const res = await axios.get(
+        "http://localhost:4600/api/weightdetails/initial"
+      );
+
+      setFilteredList(res.data || []);
+    } catch {
       setError("Failed to load data");
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= FRONTEND SEARCH =================
-const handleSearchChange = (value) => {
-  setGateEntryNumber(value);
-  setHeaderData(null);
-  setError("");
+  // ================= SEARCH =================
+  const handleSearchChange = (value) => {
+    value = value.replace(/[^0-9]/g, ""); // only numbers
 
-  // ✅ FILTER FROM ALL DATA
-  let filtered = allList.filter(item =>
-    (item.GateEntryNumber || "")
-      .toLowerCase()
-      .includes(value.toLowerCase())
-  );
+    setGateEntryNumber(value);
+    setHeaderData(null);
+    setError("");
 
-  // ✅ SORT LATEST ON TOP
-  filtered = filtered.sort((a, b) =>
-    (b.GateEntryNumber || "").localeCompare(a.GateEntryNumber || "")
-  );
+    clearTimeout(timerRef.current);
 
-  setFilteredList(filtered);
-};
-  // ================= SELECT ITEM =================
+    timerRef.current = setTimeout(async () => {
+      // 🔥 minimum 2 digits
+      if (value.length < 2) {
+        loadInitial();
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const res = await axios.get(
+          `http://localhost:4600/api/weightdetails/search?search=${value}`
+        );
+
+        setFilteredList(res.data || []);
+      } catch (err) {
+        console.log(err);
+        setError("Search failed");
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
+  };
+
+  // ================= SELECT =================
   const handleSelect = (item) => {
     setGateEntryNumber(item.GateEntryNumber || "");
     setHeaderData(item);
-    setShowList(false);
     setError("");
   };
 
-  // ================= FETCH BUTTON LOCAL =================
-  const handleFetch = () => {
+  // ================= FETCH BUTTON =================
+  const handleFetch = async () => {
     if (!gateEntryNumber.trim()) {
       setError("Please enter Gate Entry Number");
       return;
     }
 
-    const selected = allList.find(
-      (item) => item.GateEntryNumber === gateEntryNumber
-    );
+    try {
+      setLoading(true);
 
-    if (!selected) {
-      setHeaderData(null);
-      setError("No Data Found");
-      return;
+      const res = await axios.get(
+        `http://localhost:4600/api/weightdetails/search?search=${gateEntryNumber}`
+      );
+
+      const data = res.data || [];
+
+      if (!data.length) {
+        setHeaderData(null);
+        setError("No Data Found");
+        return;
+      }
+
+      setHeaderData(data[0]);
+      setFilteredList(data);
+      setError("");
+    } catch {
+      setError("Failed to fetch data");
+    } finally {
+      setLoading(false);
     }
-
-    setHeaderData(selected);
-    setShowList(false);
-    setError("");
   };
-
   // ================= PDF PRINT =================
 const handlePrint = async () => {
   if (!headerData) return;

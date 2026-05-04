@@ -17,9 +17,9 @@ export default function LiveDashBoard() {
   const fetchData = async () => {
     try {
       const res = await axios.get(
-     //   "http://localhost:4600/api/material-trucks",
+        "http://localhost:4600/api/material-trucks",
      //   "https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/material-trucks",
-          "https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/material-trucks",
+      //    "https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/material-trucks",
         { params: { fromDate, toDate } }
       );
       setSales(res.data.sales);

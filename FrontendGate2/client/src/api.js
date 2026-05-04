@@ -1,8 +1,8 @@
 import axios from 'axios';
 //export const API_BASE = 'https://gateentry.cfapps.in30.hana.ondemand.com/api';
-export const API_BASE = 'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api';
+//export const API_BASE = 'https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api';
 //export const API_BASE = 'https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api';
-//export const API_BASE = 'http://localhost:4600/api';
+export const API_BASE = 'http://localhost:4600/api';
 
 const API_TIMEOUT_MS = 120000;
 

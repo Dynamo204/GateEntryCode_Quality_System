@@ -145,9 +145,9 @@ export default function RgpProcess() {
     setLoading(true);
     setError("");
     // Use full backend URL for SAP BTP deployment
-   //  fetch('http://localhost:4600/api/rgpprocess/vendors')
+        fetch('http://localhost:4600/api/rgpprocess/vendors')
     //  fetch(`https://GateEntry-Production-Server.cfapps.in30.hana.ondemand.com/api/rgpprocess/vendors`)
-       fetch(`https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/rgpprocess/vendors`)
+    //   fetch(`https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/rgpprocess/vendors`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch vendor data');
         return res.json();
