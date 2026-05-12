@@ -113,8 +113,9 @@ export default function Outward() {
       // Only lookup if we have at least 3 characters in either field
       const sdSearch = header.SalesDocument.trim();
       const vehSearch = header.VehicleNumber.trim();
+      const gateEntryDate = header.GateEntryDate;
      
-      if (sdSearch.length < 3 && vehSearch.length < 3) {
+      if (sdSearch.length < 2 && vehSearch.length < 2) {
         setLookupSuggestions([]);
         setShowSuggestions(false);
         return;
@@ -123,7 +124,7 @@ export default function Outward() {
       setLookupLoading(true);
       try {
         // Search by either Sales Document or Vehicle Number
-        const searchTerm = sdSearch.length >= 3 ? sdSearch : vehSearch;
+        const searchTerm = sdSearch.length >= 2 ? sdSearch : vehSearch;
         const { data } = await fetchInitialRegistrations({
           search: searchTerm,
           top: 10
@@ -346,6 +347,17 @@ export default function Outward() {
       e.preventDefault();
     }
   };
+
+function formatSapDate(sapDate) {
+  if (!sapDate) return '-';
+  // SAP format: /Date(1778572800000)/
+  const match = sapDate.match(/\d+/);
+  if (match) {
+    const date = new Date(Number(match[0]));
+    return date.toISOString().slice(0, 10);
+  }
+  return sapDate;
+}
  
   return (
     <div className="create-header-container">
@@ -422,11 +434,10 @@ export default function Outward() {
                       >
                         <div className="suggestion-main">
                           <strong>SD: {reg.SalesDocument}</strong>
-                          <span className="suggestion-vehicle">{reg.VehicleNumber}</span>
-                        </div>
-                        <div className="suggestion-details">
-                          <span>Transporter: {reg.Transporter || '-'}</span>
-                          <span>Expected Qty: {reg.ExpectedQty || '-'}</span>
+                          <strong>Entry Number :{reg.RegistrationNumber}</strong>
+                          <span className="suggestion-vehicle">Vehicle :{reg.VehicleNumber}</span>
+                          <span className="suggestion-gateEntryDate">Date : {formatSapDate(reg.SAP_CreatedDateTime)}</span>
+                          
                         </div>
                       </div>
                     ))}

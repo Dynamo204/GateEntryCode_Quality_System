@@ -2145,23 +2145,39 @@ app.post('/api/headers/itp-weighment', async (req, res) => {
       });
     }
 
-    const { date: currentDate3 } = getCurrentIndiaDateTimeParts();
+  //  const { date: currentDate3 } = not();
 
+    // Get current date in India time zone (12am–11:59pm IST)
+    function getCurrentIndiaDate() {
+      const indiaNow = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+      );
+      const year = indiaNow.getFullYear();
+      const month = String(indiaNow.getMonth() + 1).padStart(2, '0');
+      const day = String(indiaNow.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Convert SAP date to YYYY-MM-DD in India time zone
     function convertSapDateToYMD(sapDate) {
       if (!sapDate) return null;
-
       if (typeof sapDate === 'string' && sapDate.startsWith('/Date(')) {
-        const timestamp = parseInt(sapDate.match(/\d+/)[0]);
-        const date = new Date(timestamp);
-        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const timestamp = parseInt(sapDate.match(/\d+/)[0], 10);
+        const indiaDate = new Date(
+          new Date(timestamp).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+        );
+        const year = indiaDate.getFullYear();
+        const month = String(indiaDate.getMonth() + 1).padStart(2, '0');
+        const day = String(indiaDate.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
       }
-
       return sapDate;
     }
 
+    const currentDateIndia = getCurrentIndiaDate();
     const gateEntryDateFormatted = convertSapDateToYMD(header.GateEntryDate);
-    console.log('Gate Entry Date (formatted):', gateEntryDateFormatted, 'Current Date:', currentDate3);
-    if (gateEntryDateFormatted !== currentDate3) {
+    console.log('Gate Entry Date (formatted):', gateEntryDateFormatted, 'Current Date:', currentDateIndia);
+    if (gateEntryDateFormatted !== currentDateIndia) {
       return res.status(400).json({
         success: false,
         message: `Weighment not allowed. Gate Entry (${gateEntryNumber}) is from ${gateEntryDateFormatted}. Create new Gate Entry.`,
@@ -3563,27 +3579,44 @@ app.get('/api/initial-registrations', async (req, res) => {
     const wantCount = String(req.query.count || 'false').toLowerCase() === 'true';
     const orderby = req.query.$orderby || 'SAP_CreatedDateTime desc'; // default to newest first
 
-    // Build OData $filter using substringof (OData V2 compatible)
+
+    // Build OData $filter using substringof (OData V2 compatible) and date filter
     let filterExpr = '';
+    const date = (req.query.date || '').trim();
     if (search) {
       const s = search.replace(/'/g, "''"); // escape single quotes for OData
-      // Use substringof instead of contains - OData V2 syntax
+      // Use substringof only on string properties - OData V2 syntax
       const clauses = [
         `substringof('${s}',RegistrationNumber)`,
         `substringof('${s}',SalesDocument2)`,
         `substringof('${s}',VehicleNumber)`,
+        `substringof('${s}',SalesDocument)`,
         `substringof('${s}',Transporter)`,
         `substringof('${s}',SAP_Description)`
       ];
+      // If search string looks like a date (YYYY-MM-DD), also search SAP_CreatedDateTime
+      if (/^\d{4}-\d{2}-\d{2}$/.test(search)) {
+        clauses.push(`startswith(SAP_CreatedDateTime,'${s}')`);
+      }
       filterExpr = clauses.join(' or ');
+    }
+    // If date is provided, filter by date part of SAP_CreatedDateTime
+    if (date) {
+      const dateClause = `startswith(SAP_CreatedDateTime,'${date}')`;
+      if (filterExpr) {
+        filterExpr = `(${filterExpr}) and ${dateClause}`;
+      } else {
+        filterExpr = dateClause;
+      }
     }
 
     let path = `/YY1_INITIALREGISTRATION?$format=json&$top=${top}`;
     if (filterExpr) path += `&$filter=${encodeURIComponent(filterExpr)}`;
     if (wantCount) path += `&$inlinecount=allpages`;
-    if (orderby) path += `&$orderby=${encodeURIComponent(orderby)}`; // Add orderby to SAP query
+    if (orderby) path += `&$orderby=${encodeURIComponent(orderby)}`; 
 
     console.log('[DEBUG] Initial Registration query path:', path);
+
 
     const resp = await sapAxiosInitialRegistration.get(path);
 
@@ -4998,9 +5031,7 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
 
     if (WeighmentUpdate.GrossWeight === null || WeighmentUpdate.GrossWeight === undefined || WeighmentUpdate.GrossWeight.length === 0) {
       return res.status(400).json({ error: 'GrossWeight is required in the request body' });  }
-    if (Number(WeighmentUpdate.NetWeight) < 0.100) {
-     return res.status(400).json({error: "NetWeight should be greater than 99 KG",
-      DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument    });   }
+
  
     if (Number(WeighmentUpdate?.NetWeight) < 0.100) {
  

@@ -22,7 +22,8 @@ export default function ReprintGateEntry() {
       setLoading(true);
 
       const res = await axios.get(
-        "http://localhost:4600/api/weightdetails/initial"
+       // "http://localhost:4600/api/weightdetails/initial"
+        "https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/initial"
       );
 
       setFilteredList(res.data || []);
@@ -54,7 +55,8 @@ export default function ReprintGateEntry() {
         setLoading(true);
 
         const res = await axios.get(
-          `http://localhost:4600/api/weightdetails/search?search=${value}`
+        //  `http://localhost:4600/api/weightdetails/search?search=${value}`
+          `https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/search?search=${value}`
         );
 
         setFilteredList(res.data || []);
@@ -85,7 +87,8 @@ export default function ReprintGateEntry() {
       setLoading(true);
 
       const res = await axios.get(
-        `http://localhost:4600/api/weightdetails/search?search=${gateEntryNumber}`
+        // `http://localhost:4600/api/weightdetails/search?search=${gateEntryNumber}`
+        `https://GateEntry-QLT.cfapps.in30.hana.ondemand.com/api/weightdetails/search?search=${gateEntryNumber}`
       );
 
       const data = res.data || [];
