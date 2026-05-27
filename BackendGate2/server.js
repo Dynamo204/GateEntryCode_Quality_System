@@ -5017,41 +5017,21 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
       OutboundDeliveryUpdate,
       GoodsIssue
     } = req.body;
+    const weighmentPayload = { ...(WeighmentUpdate || {}) };
      if (GateEntryNumber === null || GateEntryNumber === undefined || GateEntryNumber === '') {
       return res.status(400).json({ error: 'GateEntryNumber is required in the request body Weighment2' });
     }
     if (OutboundDeliveryUpdate.DeliveryDocument === null || OutboundDeliveryUpdate.DeliveryDocument === undefined || OutboundDeliveryUpdate.DeliveryDocument === '') {
       return res.status(400).json({ error: 'DeliveryDocument is required in the request body' });
     }
-    if (WeighmentUpdate.NetWeight === null || WeighmentUpdate.NetWeight === undefined || WeighmentUpdate.NetWeight.length === 0) {
+    if (weighmentPayload.NetWeight === null || weighmentPayload.NetWeight === undefined || weighmentPayload.NetWeight.length === 0) {
       return res.status(400).json({ error: 'NetWeight is required in the request body' });  }
 
-    if (WeighmentUpdate.Status === 'Cancelled' ) {
+    if (weighmentPayload.Status === 'Cancelled' ) {
       return res.status(400).json({ error: 'Weighment status is cancelled' });  }
 
-    if (WeighmentUpdate.GrossWeight === null || WeighmentUpdate.GrossWeight === undefined || WeighmentUpdate.GrossWeight.length === 0) {
+    if (weighmentPayload.GrossWeight === null || weighmentPayload.GrossWeight === undefined || weighmentPayload.GrossWeight.length === 0) {
       return res.status(400).json({ error: 'GrossWeight is required in the request body' });  }
-
- 
-    if (Number(WeighmentUpdate?.NetWeight) < 0.100) {
- 
-     const { token, cookies } = await fetchCsrfTokenOutboundDelivery();
- 
-     const deletePath = `/A_OutbDeliveryHeader('${OutboundDeliveryUpdate.DeliveryDocument}')`;
- 
-      await sapAxiosOBD.delete(deletePath, {
-      headers: {
-       "x-csrf-token": token,
-       "If-Match": "*",
-       Cookie: cookies
-      }
-      });
- 
-      return res.status(400).json({
-       message: "NetWeight below 99 KG. Outbound Delivery Deleted",
-       DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument
-       });
-      }
  
     let result = {
       weighment: null,
@@ -5070,13 +5050,6 @@ app.post("/api/goodsissue-and-invoice", async (req, res) => {
       uuid = getResp.data?.d?.results?.[0]?.SAP_UUID;
     }
       console.log(getResp?.data?.d?.results?.[0], "Weighement response getResp data");
- 
-
-
-if (!WeighmentUpdate) {
-  WeighmentUpdate = {};
-}
-
 function formatSapODataDate(date) {
   if (!date) return null;
 
@@ -5133,18 +5106,67 @@ const istDate = new Date(
 // Format date
 const formattedDate = formatDateDDMMYYYY(istDate);
 // ✅ use correct field names
-WeighmentUpdate.VehicleStatus = "OUT";
-WeighmentUpdate.OutwardTime = formatSapTime(systemtime);
-WeighmentUpdate.GateOutDate = formatSapODataDate(systemdate);
+weighmentPayload.VehicleStatus = "OUT";
+weighmentPayload.OutwardTime = formatSapTime(systemtime);
+weighmentPayload.GateOutDate = formatSapODataDate(systemdate);
 
-if (GateEntryNumber && WeighmentUpdate) {
+const netWeightValue = Number(weighmentPayload?.NetWeight);
+
+
+if (Number(WeighmentUpdate?.NetWeight) < 0.100)
+  {
+//if (netWeightValue < 0.100) {
+  if (!uuid) {
+    return res.status(404).json({ error: "Weighment not found" });
+  }
+
+  weighmentPayload.Status = "Cancelled";
+
+  const { token: weightToken, cookies: weightCookies } = await fetchCsrfTokenWeight();
+
+  await sapAxiosWeight.patch(
+    `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`,
+    weighmentPayload,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": weightToken,
+        "If-Match": "*",
+        Cookie: weightCookies
+      }
+    }
+  );
+
+  const { token: deleteToken, cookies: deleteCookies } = await fetchCsrfTokenOutboundDelivery();
+  const deletePath = `/A_OutbDeliveryHeader('${OutboundDeliveryUpdate.DeliveryDocument}')`;
+
+  await sapAxiosOBD.delete(deletePath, {
+    headers: {
+      "x-csrf-token": deleteToken,
+      "If-Match": "*",
+      Cookie: deleteCookies
+    }
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "NetWeight below 100. Outbound Delivery deleted and Gate Entry marked OUT/Cancelled",
+    DeliveryDocument: OutboundDeliveryUpdate.DeliveryDocument,
+    NetWeight: weighmentPayload.NetWeight,
+    GateEntryNumber,
+    weighmentStatus: weighmentPayload.Status,
+    vehicleStatus: weighmentPayload.VehicleStatus
+  });
+}
+
+if (GateEntryNumber && weighmentPayload) {
   if (!uuid) return res.status(404).json({ error: "Weighment not found" });
 
   const { token, cookies } = await fetchCsrfTokenWeight();
 
   await sapAxiosWeight.patch(
     `/YY1_CAPTURINGWEIGHTDETAILS(guid'${uuid}')`,
-    WeighmentUpdate,
+    weighmentPayload,
     {
       headers: {
         "Content-Type": "application/json",
